@@ -2,9 +2,9 @@
 #include "ui_mainwindow.h"
 
 MainWindow::MainWindow( FTPAPI ftpAPI, QWidget *parent )
-    : QMainWindow(parent), ui(new Ui::MainWindow), ftpAPI(ftpAPI)
+    : QMainWindow( parent ), ui( new Ui::MainWindow ), ftpAPI( ftpAPI )
 {
-    ui->setupUi(this);
+    ui->setupUi( this );
 
 }
 

@@ -14,6 +14,10 @@ class FTPAPI
     public:
         FTPAPI();
 
+        int connect_server( char *host, int port ) {
+            return port;
+        }
+
         int login_server( SOCKET sock, char *user, char *pwd ) {
             qDebug() << sock << user << pwd;
             return ( user[0] == '1' ) ? 0 : 530;
