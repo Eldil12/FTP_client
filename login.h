@@ -10,6 +10,7 @@
 #include <QMessageBox>
 
 #include "ftpapi.h"
+#include "mainwindow.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Login; }

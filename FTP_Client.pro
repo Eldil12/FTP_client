@@ -18,14 +18,17 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     ftpapi.cpp \
     main.cpp \
-    login.cpp
+    login.cpp \
+    mainwindow.cpp
 
 HEADERS += \
     ftpapi.h \
-    login.h
+    login.h \
+    mainwindow.h
 
 FORMS += \
-    login.ui
+    login.ui \
+    mainwindow.ui
 
 LIBS += \
     libws2_32

@@ -25,7 +25,10 @@ void Login::on_pushButton_Login_clicked()
     } else {
 
         /* 登录成功时关闭登录页面，打开主页面 */
-        // TODO：Login如何调用主页面？
+        this->close();
+        MainWindow *mainWindow = new MainWindow(ftpAPI);
+        QApplication::beep();
+        mainWindow->show();
 
     }
 }
