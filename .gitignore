@@ -1,2 +1,5 @@
 # Qt 用户配置文件
 *.user
+
+# VS Code 配置文件
+.vscode/

@@ -20,7 +20,7 @@
    <property name="geometry">
     <rect>
      <x>50</x>
-     <y>100</y>
+     <y>200</y>
      <width>120</width>
      <height>30</height>
     </rect>
@@ -45,9 +45,9 @@
   <widget class="QLineEdit" name="lineEdit_UserName">
    <property name="geometry">
     <rect>
-     <x>200</x>
-     <y>100</y>
-     <width>200</width>
+     <x>150</x>
+     <y>200</y>
+     <width>250</width>
      <height>30</height>
     </rect>
    </property>
@@ -55,9 +55,12 @@
     <font>
      <family>Arial</family>
      <pointsize>12</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
+     <weight>50</weight>
+     <bold>false</bold>
     </font>
+   </property>
+   <property name="mouseTracking">
+    <bool>false</bool>
    </property>
    <property name="tabletTracking">
     <bool>true</bool>
@@ -67,7 +70,7 @@
    <property name="geometry">
     <rect>
      <x>50</x>
-     <y>150</y>
+     <y>300</y>
      <width>120</width>
      <height>30</height>
     </rect>
@@ -92,16 +95,20 @@
   <widget class="QLineEdit" name="lineEdit_Password">
    <property name="geometry">
     <rect>
-     <x>200</x>
-     <y>150</y>
-     <width>200</width>
+     <x>150</x>
+     <y>300</y>
+     <width>250</width>
      <height>30</height>
     </rect>
    </property>
    <property name="font">
     <font>
+     <family>Arial</family>
      <pointsize>10</pointsize>
     </font>
+   </property>
+   <property name="mouseTracking">
+    <bool>false</bool>
    </property>
    <property name="tabletTracking">
     <bool>true</bool>
@@ -124,7 +131,7 @@
      <family>等线</family>
      <pointsize>16</pointsize>
      <weight>50</weight>
-     <italic>true</italic>
+     <italic>false</italic>
      <bold>false</bold>
      <stylestrategy>PreferAntialias</stylestrategy>
     </font>
@@ -143,7 +150,7 @@
    <property name="geometry">
     <rect>
      <x>50</x>
-     <y>50</y>
+     <y>100</y>
      <width>120</width>
      <height>30</height>
     </rect>
@@ -168,9 +175,9 @@
   <widget class="QLineEdit" name="lineEdit_HostName">
    <property name="geometry">
     <rect>
-     <x>200</x>
-     <y>50</y>
-     <width>150</width>
+     <x>150</x>
+     <y>100</y>
+     <width>200</width>
      <height>30</height>
     </rect>
    </property>
@@ -178,19 +185,22 @@
     <font>
      <family>Arial</family>
      <pointsize>12</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
+     <weight>50</weight>
+     <bold>false</bold>
     </font>
    </property>
    <property name="tabletTracking">
     <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>101.201.254.158</string>
    </property>
   </widget>
   <widget class="QLineEdit" name="lineEdit_Port">
    <property name="geometry">
     <rect>
      <x>360</x>
-     <y>50</y>
+     <y>100</y>
      <width>40</width>
      <height>30</height>
     </rect>
@@ -199,12 +209,18 @@
     <font>
      <family>Arial</family>
      <pointsize>12</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
+     <weight>50</weight>
+     <bold>false</bold>
     </font>
+   </property>
+   <property name="mouseTracking">
+    <bool>false</bool>
    </property>
    <property name="tabletTracking">
     <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>21</string>
    </property>
   </widget>
  </widget>

@@ -593,6 +593,10 @@ private:
             {
                 *size += send_len;
             }
+
+        int login_server( SOCKET sock, char *user, char *pwd ) {
+
+            return ( user[0] == '1' ) ? 0 : 530;
         }
         //完成上传
         closesocket(d_sock);

@@ -13,15 +13,18 @@
 #include "mainwindow.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class Login; }
+    namespace Ui {
+
+        class Login;
+    }
 QT_END_NAMESPACE
 
-class Login : public QWidget
-{
+class Login : public QWidget {
+
     Q_OBJECT
 
 public:
-    Login( FTPAPI ftpAPI, QWidget *parent = nullptr );
+    Login(FTPAPI ftpAPI, QWidget *parent = nullptr);
     ~Login();
 
 private slots:
@@ -32,6 +35,6 @@ private:
 
     FTPAPI ftpAPI;
 
-    char *string2char( QString s );
+    char *string2char(QString s);
 };
 #endif // LOGIN_H
