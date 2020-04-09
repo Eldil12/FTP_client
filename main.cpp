@@ -1,5 +1,5 @@
 #include "login.h"
-
+#include "ftpapi.h"
 #include <QApplication>
 
 int main(int argc, char *argv[])

@@ -20,12 +20,14 @@ void Login::on_pushButton_Login_clicked()
     QString userName = ui->lineEdit_UserName->text();
     QString password = ui->lineEdit_Password->text();
 
-    if ( !ftpAPI.connect_server( string2char(hostName), port.toInt() ) ) {
+    int result = ftpAPI.login_server( string2char(hostName), port.toInt(), string2char(userName), string2char(password) );
+
+    if ( result == -1 ) {
 
         /* 连接远程主机失败 */
         QMessageBox::about( nullptr, "登录失败", "未能连接远程主机");
 
-    } else if ( ftpAPI.login_server( string2char(userName), string2char(password) ) ) {
+    } else if ( result == -2 ) {
 
         /* 登录失败时弹出信息框，提示密码错误 */
         QMessageBox::about( nullptr, "登录失败", "用户名或密码不正确，请检查后再次尝试");
