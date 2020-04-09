@@ -1,6 +1,5 @@
 #include "ftpapi.h"
 
-FTPAPI::FTPAPI()
-{
+FTPAPI::FTPAPI() {
 
 }
