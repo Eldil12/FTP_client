@@ -19,7 +19,7 @@ class FTPAPI
         }
 
         int login_server( SOCKET sock, char *user, char *pwd ) {
-            qDebug() << sock << user << pwd;
+
             return ( user[0] == '1' ) ? 0 : 530;
         }
 
