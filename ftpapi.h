@@ -14,33 +14,163 @@
 #define BUFSIZE 512
 #define FTP_SUCCESS 200  //成功
 #define FTP_SERVICE_READY 220 //服务器就绪
-#define FTP_LOGIN_SUCCESS 230 //登录因特网服务器
+#define FTP_LOGIN_SUCCESS 230 //登录成功
 #define FTP_FILE_ACTION_COMPLETE 250 //文件行为完成
 #define FTP_FILE_CREATED 257 //文件创建成功
-#define FTP_PASSWORD_REQUIREd 331 //要求密码
+#define FTP_PASSWORD_REQUIREd 331 //要求输入密码
 #define FTP_LOGIN_PASSWORD_INCORRECT 530 //用户密码错误
+#define FTP_SERVICE_CLOSE 421 //服务关闭
 
 class FTPAPI
 {
 public:
+    /**
+     * @brief 连接并登录FTP服务器 USER PASS
+     * @param 服务器ip
+     * @param 端口号
+     * @param 用户名
+     * @param 密码
+     * @return 已连接到FTP服务器的socket，-1：连接远程主机失败，-2：用户名或密码错误
+     */
     int login_server(char* ip, int port, char* user, char* pwd)
     {
-        //ip = const_cast<char*>("101.201.254.158");
-        clientSocket = ftp_connect(ip, port, user, pwd); //登录到FTP服务器
+        clientSocket = connect_server(ip, port);
+        if (clientSocket == -1)
+        {
+            return -1;
+        }
+        if (login_server(clientSocket, user, pwd) == -1)
+        {
+            closesocket(clientSocket);
+            return -2;
+        }
+
         return clientSocket;
     }
+
+    /**
+     * @brief 断开FTP服务器
+     * @return 断开服务器的状态码
+     */
     int ftp_quit()
     {
         return ftp_quit(clientSocket);
     }
 
-private:
-    char* ip;
-    SOCKET clientSocket;
     /**
-     * 作用: 创建一个Socket并返回.
-     * 参数: IP或域名, 端口
-     * 返回值: Socket套接字
+     * @brief 设置FTP传输类型 TYPE
+     * @param 类型，A:ascii I:Binary
+     * @return 0：成功，-1：失败
+     */
+    int ftp_type(char mode)
+    {
+        return ftp_type(clientSocket, mode);
+    }
+
+    /**
+     * @brief 更改工作目录 CWD
+     * @param 工作目录
+     * @return 0：成功，-1：失败
+     */
+    int ftp_cwd(char* path)
+    {
+        return ftp_cwd(clientSocket, path);
+    }
+
+    /**
+     * @brief 回到上级目录 CDUP
+     * @return 0：正常操作返回，其它：服务器返回错误码
+     */
+    int ftp_cdup()
+    {
+        return ftp_cdup(clientSocket);
+    }
+
+    /**
+     * @brief 创建目录 MKD
+     * @param 文件目录路径(可相对路径，绝对路径)
+     * @return 0：正常操作返回，其他：服务器返回错误码
+     */
+    int ftp_mkd(char* path)
+    {
+        return ftp_mkd(clientSocket, path);
+    }
+
+    /**
+     * @brief 如果是文件名列出文件信息，如果是目录则列出文件列表 LIST
+     * @param 相对路径或绝对路径
+     * @param 列表信息
+     * @param 列表信息大小
+     * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
+     */
+    int ftp_list(char* path, char** data, int* data_len)
+    {
+       return ftp_list(clientSocket, path, data, data_len);
+    }
+
+    /**
+     * @brief 删除目录 RMD
+     * @param 相对路径或绝对路径
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_deletefolder(char* path)
+    {
+        return ftp_deletefolder(clientSocket, path);
+    }
+
+    /**
+     * @brief 删除文件 DELE
+     * @param 相对路径或绝对路径
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_deletefile(char* filename)
+    {
+        return ftp_deletefile(clientSocket, filename);
+    }
+
+    /**
+     * @brief 修改文件名&移动目录 RNFR RNTO
+     * @param 源地址
+     * @param 目的地址
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_renamefile(char* s, char* d)
+    {
+        return ftp_renamefile(clientSocket, s, d);
+    }
+
+    /**
+     * @brief 从服务器复制文件到本地 RETR
+     * @param 源地址
+     * @param 目的地址
+     * @param 文件大小
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     */
+    int ftp_server2local(char* s, char* d, int* size)
+    {
+        return ftp_server2local(clientSocket, s, d, size);
+    }
+
+    /**
+     * @brief 从本地复制文件到服务器 STOR
+     * @param 源地址
+     * @param 目的地址
+     * @param 文件大小
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     */
+    int ftp_local2server(char* s, char* d, int* size)
+    {
+        return ftp_local2server(clientSocket, s, d, size);
+    }
+
+private:
+    SOCKET clientSocket;
+
+    /**
+     * @brief 创建一个socket并返回
+     * @param 服务器ip或域名
+     * @param 端口号
+     * @return SOCKET
      */
     SOCKET socket_connect(char* host, int port)
     {
@@ -64,7 +194,6 @@ private:
         {
             memcpy(&ch, server->h_addr_list[i], 4);
             sprintf(ip, "%d.%d.%d.%d", ch[0], ch[1], ch[2], ch[3]);
-            //printf("%s\n",ip);
             i++;
         }
 
@@ -82,8 +211,7 @@ private:
         //指定服务器地址
         struct sockaddr_in address;
         address.sin_family = AF_INET;
-        //address.sin_addr.S_un.S_addr = inet_addr(ip);
-        memcpy(&address.sin_addr, server->h_addr, server->h_length);
+        address.sin_addr.S_un.S_addr = inet_addr(ip);
         address.sin_port = htons((unsigned short)port);
         //连接
         if (SOCKET_ERROR == connect(s, (LPSOCKADDR)&address, sizeof(address)))
@@ -93,11 +221,13 @@ private:
         }
         return s;
     }
+
     /**
-     * 作用: 连接到一个FTP服务器，返回socket
-     * 参数: IP或域名, 端口
-     * 返回值: Socket套接字
-     * */
+     * @brief 连接到FTP服务器
+     * @param 服务器ip或域名
+     * @param 端口号
+     * @return SOCKET
+     */
     SOCKET connect_server(char* host, int port)
     {
         SOCKET ctrl_sock;
@@ -127,10 +257,14 @@ private:
         }
         return ctrl_sock;
     }
+
     /**
-     * 作用: send发送命令，并返回recv结果
-     * 参数: SOCKET，命令，命令返回码-命令返回描述，命令返回字节数
-     * 返回值: 0 表示发送成功  -1表示发送失败
+     * @brief send发送命令，并返回recv结果
+     * @param SOCKET
+     * @param 命令
+     * @param 命令返回码-命令返回描述
+     * @param 命令返回字节数
+     * @return 0：发送成功，-1：发送失败
      */
     int ftp_sendcmd_re(SOCKET sock, char* cmd, char* re_buf, SSIZE_T* len)
     {
@@ -150,10 +284,12 @@ private:
             sprintf(re_buf, "%s", buf);
         return 0;
     }
+
     /**
-     * 作用: send发送命令
-     * 参数: SOCKET,命令
-     * 返回值: FTP响应码
+     * @brief send发送命令
+     * @param SOCKET
+     * @param 命令
+     * @return FTP响应码
      */
     int ftp_sendcmd(SOCKET sock, char* cmd)
     {
@@ -171,9 +307,11 @@ private:
     }
 
     /**
-     * 作用: 登录FTP服务器
-     * 参数: SOCKET套接字，明文用户名，明文密码
-     * 返回值: 0 表示登录成功   -1 表示登录失败
+     * @brief 登录FTP服务器 USER PASS
+     * @param SOCKET
+     * @param 用户名
+     * @param 密码
+     * @return 0：登录成功，-1：登录失败
      */
     int login_server(SOCKET sock, char* user, char* pwd)
     {
@@ -204,10 +342,10 @@ private:
             return -1;
         }
     }
+
     /**
-     * 作用: winsock使用后，要调用WSACleanup函数关闭网络设备，以便释放其占用的资源
-     * 参数: SOCKET
-     * 返回值: 无
+     * @brief winsock使用后，要调用WSACleanup函数关闭网络设备，以便释放其占用的资源
+     * @param SOCKET
      */
     void socket_close(int c_sock)
     {
@@ -215,29 +353,9 @@ private:
     }
 
     /**
-     * 作用: 连接到FTP服务器
-     * 参数: hostname或IP，端口，用户名，密码
-     * 返回值: 已连接到FTP服务器的SOCKET，-1表示连接失败，-2表示登录失败
-     */
-    SOCKET ftp_connect(char* host, int port, char* user, char* pwd)
-    {
-        SOCKET sock;
-        sock = connect_server(host, port);
-        if (-1 == sock)
-        {
-            return -1;
-        }
-        if (-1 == login_server(sock, user, pwd))
-        {
-            closesocket(sock);
-            return -2;
-        }
-        return sock;
-    }
-    /**
-     * 作用: 断开FTP服务器
-     * 参数: SOCKET
-     * 返回值: 成功断开状态码
+     * @brief 断开FTP服务器 QUIT
+     * @param SOCKET
+     * @return 成功断开状态码
      */
     int ftp_quit(SOCKET sock)
     {
@@ -248,10 +366,12 @@ private:
         socket_close(sock);
         return result;
     }
+
     /**
-     * 作用: 设置FTP传输类型 A:ascii I:Binary
-     * 参数: SOCkET，类型
-     * 返回值: 0 表示成功   -1 表示失败
+     * @brief 设置FTP传输类型 TYPE
+     * @param SOCKET
+     * @param 类型，A:ascii I:Binary
+     * @return 0：成功，-1：失败
      */
     int ftp_type(SOCKET sock, char mode)
     {
@@ -262,10 +382,12 @@ private:
         else
             return 0;
     }
+
     /**
-     * 作用: 更改工作目录
-     * 参数: SOCKET，工作目录
-     * 返回值: 0 表示成功  -1 表示失败
+     * @brief 更改工作目录 CWD
+     * @param SOCKET
+     * @param 工作目录
+     * @return 0：成功，-1：失败
      */
     int ftp_cwd(SOCKET sock, char* path)
     {
@@ -278,10 +400,11 @@ private:
         else
             return 0;
     }
+
     /**
-     * 作用: 回到上级目录
-     * 参数: SOCKET
-     * 返回值: 0 正常操作返回  result 服务器返回响应码
+     * @brief 回到上级目录 CDUP
+     * @param SOCKET
+     * @return 0：正常操作返回，其它：服务器返回错误码
      */
     int ftp_cdup(SOCKET sock)
     {
@@ -293,11 +416,13 @@ private:
         else
             return result;
     }
+
     /**
-     * 作用: 创建目录
-     * 参数: SOCKET，文件目录路径(可相对路径，绝对路径)
-     * 返回值: 0 正常操作返回  result 服务器返回响应码
-     * */
+     * @brief 创建目录 MKD
+     * @param SOCKET
+     * @param 文件目录路径(可相对路径，绝对路径)
+     * @return 0：正常操作返回，其他：服务器返回错误码
+     */
     int ftp_mkd(SOCKET sock, char* path)
     {
         char buf[BUFSIZE];
@@ -309,13 +434,12 @@ private:
         else
             return 0;
     }
+
     /**
-     * 作用: 连接到PASV接口
-     *       PASV（被动）方式的连接过程是：
-     *       客户端向服务器的FTP端口（默认是21）发送连接请求，
-     *       服务器接受连接，建立一条命令链路。
-     * 参数: 命令链路SOCKET cmd-socket
-     * 返回值: 数据链路SOCKET raw-socket  -1 表示创建失败
+     * @brief 连接到PASV接口 PASV
+     *        被动方式连接过程：客户端向服务器的FTP端口（默认是21）发送连接请求，服务器接受连接，建立一条命令链路。
+     * @param 命令链路SOCKET cmd-socket
+     * @return 数据链路SOCKET raw-socket，-1：创建失败
      */
     SOCKET ftp_pasv_connect(SOCKET c_sock)
     {
@@ -347,9 +471,12 @@ private:
     }
 
     /**
-     * 作用: 列出FTP工作空间的所有目录
-     * 参数: 命令链路SOCKET，工作空间，列表信息，列表信息大小
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码  -1 表示创建pasv错误
+     * @brief 如果是文件名列出文件信息，如果是目录则列出文件列表 LIST
+     * @param SOCKET
+     * @param 相对路径或绝对路径
+     * @param 列表信息
+     * @param 列表信息大小
+     * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
      */
     int ftp_list(SOCKET c_sock, char* path, char** data, int* data_len)
     {
@@ -403,10 +530,12 @@ private:
         *data_len = total_len;
         return 0;
     }
+
     /**
-     * 作用: 删除目录
-     * 参数: 命令链路SOCKET，路径目录
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码
+     * @brief 删除目录 RMD
+     * @param 命令链路SOCKET
+     * @param 相对路径或绝对路径
+     * @return 0：成功，其他：服务器返回错误码
      */
     int ftp_deletefolder(SOCKET sock, char* path)
     {
@@ -422,10 +551,12 @@ private:
         }
         return 0;
     }
+
     /**
-     * 作用: 删除文件
-     * 参数: 命令链路SOCKET，路径文件(相对/绝对)
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码
+     * @brief 删除文件 DELE
+     * @param 命令链路SOCKET
+     * @param 相对路径或绝对路径
+     * @return 0：成功，其他：服务器返回错误码
      */
     int ftp_deletefile(SOCKET sock, char* filename)
     {
@@ -440,10 +571,13 @@ private:
         }
         return 0;
     }
+
     /**
-     * 作用: 修改文件名&移动目录
-     * 参数: 命令链路SOCKET，源地址，目的地址
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码
+     * @brief 修改文件名&移动目录 RNFR RNTO
+     * @param 命令链路SOCKET
+     * @param 源地址
+     * @param 目的地址
+     * @return 0：成功，其他：服务器返回错误码
      */
     int ftp_renamefile(SOCKET sock, char* s, char* d)
     {
@@ -461,12 +595,15 @@ private:
         }
         return 0;
     }
+
     /**
-     * 作用: 从服务器复制文件到本地 RETR
-     * 参数: SOCKET，源地址，目的地址，文件大小
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码
-     *         -1:文件创建失败  -2 pasv接口错误
-     * */
+     * @brief 从服务器复制文件到本地 RETR
+     * @param SOCKET
+     * @param 源地址
+     * @param 目的地址
+     * @param 文件大小
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     */
     int ftp_server2local(SOCKET c_sock, char* s, char* d, int* size)
     {
         SOCKET d_sock;
@@ -538,10 +675,12 @@ private:
     }
 
     /**
-     * 作用: 从本地复制文件到服务器 STOR
-     * 参数: SOCKET，源地址，目的地址，文件大小
-     * 返回值: 0 表示列表成功  result>0 表示其他错误响应码
-     *         -1:文件创建失败  -2 pasv接口错误
+     * @brief 从本地复制文件到服务器 STOR
+     * @param SOCKET
+     * @param 源地址
+     * @param 目的地址
+     * @param 文件大小
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
     int ftp_local2server(SOCKET c_sock, char* s, char* d, int* size)
     {
@@ -611,9 +750,11 @@ private:
     }
 
     /**
-     * 作用: 获取一行响应码
-     * 参数:
-     * 返回值:
+     * @brief 获取一行响应码
+     * @param SOCKET
+     * @param 命令返回码-命令返回描述
+     * @param 命令返回字节数
+     * @return 0：发送成功，-1：发送失败
      */
     int ftp_recv(SOCKET sock, char* re_buf, SSIZE_T* len)
     {
@@ -633,7 +774,6 @@ private:
             sprintf(re_buf, "%s", buf);
         return 0;
     }
-
 };
 
 #endif // FTPAPI_H
