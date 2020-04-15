@@ -7,6 +7,7 @@
 #define FTPAPI_H
 
 #include <iostream>
+#include <io.h>
 #include <string.h>
 #include <stdlib.h>
 #include <winsock2.h>
@@ -55,16 +56,6 @@ public:
     int ftp_quit()
     {
         return ftp_quit(clientSocket);
-    }
-
-    /**
-     * @brief 设置FTP传输类型 TYPE
-     * @param 类型，A:ascii I:Binary
-     * @return 0：成功，-1：失败
-     */
-    int ftp_type(char mode)
-    {
-        return ftp_type(clientSocket, mode);
     }
 
     /**
@@ -140,7 +131,7 @@ public:
     }
 
     /**
-     * @brief 从服务器复制文件到本地 RETR
+     * @brief 从服务器复制文件到本地 TYPE PASV RETR
      * @param 源地址
      * @param 目的地址
      * @param 文件大小
@@ -152,7 +143,7 @@ public:
     }
 
     /**
-     * @brief 从本地复制文件到服务器 STOR
+     * @brief 从本地复制文件到服务器 TYPE PASV STOR
      * @param 源地址
      * @param 目的地址
      * @param 文件大小
@@ -164,7 +155,7 @@ public:
     }
 
 private:
-    SOCKET clientSocket;
+    SOCKET clientSocket; // 命令链路SOCKET
 
     /**
      * @brief 创建一个socket并返回
@@ -597,7 +588,7 @@ private:
     }
 
     /**
-     * @brief 从服务器复制文件到本地 RETR
+     * @brief 从服务器复制文件到本地 TYPE PASV RETR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
@@ -675,7 +666,101 @@ private:
     }
 
     /**
-     * @brief 从本地复制文件到服务器 STOR
+     * @brief 从服务器复制文件到本地（支持断点续传） TYPE PASV REST RETR
+     * @param SOCKET
+     * @param 源地址
+     * @param 目的地址
+     * @param 文件大小
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     */
+    int ftp_download(SOCKET c_sock, char* s, char* d, int* size)
+    {
+        SOCKET d_sock;
+        SSIZE_T len, write_len;
+        char buf[BUFSIZ];
+        int result;
+        long download_size;
+        *size = 0;
+
+        // 打开本地文件
+        FILE* fp = fopen(d, "ab+");
+        if (nullptr == fp)
+        {
+            printf("Can't Open the file.\n");
+            return -1;
+        }
+
+        // 获取文件已下载的字节数
+        download_size = filelength(fileno(fp));
+
+        // 设置传输模式TYPE
+        ftp_type(c_sock, 'I');
+
+        // 连接到PASV接口用于传输文件
+        d_sock = ftp_pasv_connect(c_sock);
+        if (-1 == d_sock)
+        {
+            fclose(fp);
+            return -2;
+        }
+
+        // 发送REST命令
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "REST %ld\r\n", download_size + 1);
+        result = ftp_sendcmd(c_sock, buf);
+        if (result >= 300 || result == 0)
+        {
+            fclose(fp);
+            return result;
+        }
+
+        // 发送RETR命令
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "RETR %s\r\n", s);
+        result = ftp_sendcmd(c_sock, buf);
+        // 150 Opening data channel for file download from server of "xxxx"
+        if (result >= 300 || result == 0) // 失败可能是没有权限什么的，具体看响应码
+        {
+            fclose(fp);
+            return result;
+        }
+
+        // 开始向PASV读取数据(下载)
+        memset(buf, 0, sizeof(buf));
+        while ((len = recv(d_sock, buf, BUFSIZE, 0)) > 0)
+        {
+            write_len = fwrite(&buf, len, 1, fp);
+            if (write_len != 1) // 写入文件不完整
+            {
+                closesocket(d_sock); // 关闭套接字
+                fclose(fp); // 关闭文件
+                return -1;
+            }
+            if (nullptr != size)
+            {
+                *size += write_len;
+            }
+        }
+        // 下载完成
+        closesocket(d_sock);
+        fclose(fp);
+
+        // 向服务器接收返回值
+        memset(buf, 0, sizeof(buf));
+        len = recv(c_sock, buf, BUFSIZE, 0);
+        buf[len] = 0;
+        printf("%s\n", buf);
+        sscanf(buf, "%d", &result);
+        if (result >= 300)
+        {
+            return result;
+        }
+        // 226 Successfully transferred "xxxx"
+        return 0;
+    }
+
+    /**
+     * @brief 从本地复制文件到服务器 TYPE PASV STOR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
