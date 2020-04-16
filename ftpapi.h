@@ -14,7 +14,7 @@
 
 using namespace std;
 
-#define BUFSIZE 512
+#define BUFSIZE 1024
 #define FTP_DATA_CONNECTION_OPEN 150 // 数据连接打开
 #define FTP_SUCCESS 200  // 成功
 #define FTP_FILE_STATUS 213 // 文件状态回复
@@ -27,6 +27,7 @@ using namespace std;
 #define FTP_FILE_ACTION_PAUSE 350 // 文件行为暂停
 #define FTP_SERVICE_CLOSE 421 // 服务关闭
 #define FTP_LOGIN_PASSWORD_INCORRECT 530 // 用户密码错误
+#define FTP_DATA_CONNECTION_ERROR 550 // 数据连接错误
 
 class FTPAPI
 {
@@ -761,7 +762,7 @@ private:
     }
 
     /**
-     * @brief 从服务器复制文件到本地（断点上传） TYPE PASV REST RETR
+     * @brief 从服务器复制文件到本地（断点下载） TYPE PASV REST RETR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
@@ -860,7 +861,7 @@ private:
     int ftp_replace(SOCKET c_sock, char* s, char* d)
     {
         SOCKET d_sock;
-        SSIZE_T len, send_len, total_len = 0;
+        SSIZE_T len, send_len;
         char buf[BUFSIZE];
         FILE* fp;
         int send_re, result;
@@ -907,13 +908,12 @@ private:
                 fclose(fp);
                 return -1;
             }
-            total_len += len;
         }
 
         // 完成上传
         closesocket(d_sock);
         fclose(fp);
-        //printf("发送长度：%d", total_len);
+
         //向服务器接收响应码
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
@@ -965,10 +965,22 @@ private:
         }
 
         // 获取已上传文件大小
+        send_re = ftp_filesize(c_sock, d, uploaded_size);
+        if (send_re != 0 && send_re != FTP_DATA_CONNECTION_ERROR)
+        {
+            fclose(fp);
+            return send_re;
+        }
+        else if (send_re == FTP_DATA_CONNECTION_ERROR)
+        {
+            uploaded_size = 0;
+        }
+
+        // 发送APPE命令
         memset(buf, 0, sizeof(buf));
         sprintf(buf, "APPE %s\r\n", d);
-        send_re = ftp_filesize(c_sock, d, uploaded_size);
-        if (send_re != 0)
+        send_re = ftp_sendcmd(c_sock, buf);
+        if (send_re != FTP_DATA_CONNECTION_OPEN)
         {
             fclose(fp);
             return send_re;
@@ -988,16 +1000,6 @@ private:
             fseek(fp, uploaded_size, SEEK_SET);
         }
 
-        // 发送APPE命令
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "APPE %s\r\n", d);
-        send_re = ftp_sendcmd(c_sock, buf);
-        if (send_re != FTP_DATA_CONNECTION_OPEN)
-        {
-            fclose(fp);
-            return send_re;
-        }
-
         // 开始向PASV通道写数据
         memset(buf, 0, sizeof(buf));
         while ((len = fread(buf, 1, BUFSIZE, fp)) > 0)
@@ -1007,7 +1009,7 @@ private:
             {
                 closesocket(d_sock);
                 fclose(fp);
-                return -1;
+                return -3;
             }
         }
         // 完成上传
@@ -1029,4 +1031,5 @@ private:
         }
     }
 };
+
 #endif // FTPAPI_H
