@@ -12,15 +12,21 @@
 #include <stdlib.h>
 #include <winsock2.h>
 
+using namespace std;
+
 #define BUFSIZE 512
-#define FTP_SUCCESS 200  //成功
-#define FTP_SERVICE_READY 220 //服务器就绪
-#define FTP_LOGIN_SUCCESS 230 //登录成功
-#define FTP_FILE_ACTION_COMPLETE 250 //文件行为完成
-#define FTP_FILE_CREATED 257 //文件创建成功
-#define FTP_PASSWORD_REQUIREd 331 //要求输入密码
-#define FTP_LOGIN_PASSWORD_INCORRECT 530 //用户密码错误
-#define FTP_SERVICE_CLOSE 421 //服务关闭
+#define FTP_DATA_CONNECTION_OPEN 150 // 数据连接打开
+#define FTP_SUCCESS 200  // 成功
+#define FTP_FILE_STATUS 213 // 文件状态回复
+#define FTP_SERVICE_READY 220 // 服务器就绪
+#define FTP_DATA_CONNECTION_CLOSE 226 // 数据连接关闭
+#define FTP_LOGIN_SUCCESS 230 // 登录因特网服务器
+#define FTP_FILE_ACTION_COMPLETE 250 // 文件行为完成
+#define FTP_FILE_CREATED 257 // 文件创建成功
+#define FTP_PASSWORD_REQUIRED 331 // 要求密码
+#define FTP_FILE_ACTION_PAUSE 350 // 文件行为暂停
+#define FTP_SERVICE_CLOSE 421 // 服务关闭
+#define FTP_LOGIN_PASSWORD_INCORRECT 530 // 用户密码错误
 
 class FTPAPI
 {
@@ -59,6 +65,15 @@ public:
     }
 
     /**
+     * @brief 告知服务器保持连接 NOOP
+     * @return 0：成功，-1：失败
+     */
+    int ftp_noop()
+    {
+        return ftp_noop(clientSocket);
+    }
+
+    /**
      * @brief 更改工作目录 CWD
      * @param 工作目录
      * @return 0：成功，-1：失败
@@ -88,15 +103,35 @@ public:
     }
 
     /**
+     * @brief 显示当前工作目录 PWD
+     * @param 当前工作目录
+     * @return 0：正常操作返回，其他：服务器返回错误码
+     */
+    int ftp_pwd(string &path)
+    {
+        return ftp_pwd(clientSocket, path);
+    }
+
+    /**
      * @brief 如果是文件名列出文件信息，如果是目录则列出文件列表 LIST
      * @param 相对路径或绝对路径
      * @param 列表信息
-     * @param 列表信息大小
      * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
      */
-    int ftp_list(char* path, char** data, int* data_len)
+    int ftp_list(char* path, string &data)
     {
-       return ftp_list(clientSocket, path, data, data_len);
+        return ftp_list(clientSocket, path, data);
+    }
+
+    /**
+     * @brief 获取文件大小 SIZE
+     * @param 相对路径或绝对路径
+     * @param 文件大小
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_filesize(char* filename, long& size)
+    {
+        return ftp_filesize(clientSocket, filename, size);
     }
 
     /**
@@ -131,27 +166,36 @@ public:
     }
 
     /**
-     * @brief 从服务器复制文件到本地 TYPE PASV RETR
+     * @brief 从服务器复制文件到本地（断点上传） TYPE PASV REST RETR
      * @param 源地址
      * @param 目的地址
-     * @param 文件大小
      * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_server2local(char* s, char* d, int* size)
+    int ftp_download(char* s, char* d)
     {
-        return ftp_server2local(clientSocket, s, d, size);
+        return ftp_download(clientSocket, s, d);
     }
 
     /**
-     * @brief 从本地复制文件到服务器 TYPE PASV STOR
+     * @brief 从本地上传文件到服务器（替换） TYPE PASV STOR
      * @param 源地址
      * @param 目的地址
-     * @param 文件大小
-     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     * @return 0：成功，-1：文件打开失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_local2server(char* s, char* d, int* size)
+    int ftp_replace(char* s, char* d)
     {
-        return ftp_local2server(clientSocket, s, d, size);
+        return ftp_replace(clientSocket, s, d);
+    }
+
+    /**
+     * @brief 从本地上传文件到服务器（追加） TYPE PASV SIZE APPE
+     * @param 源地址
+     * @param 目的地址
+     * @return 0：成功，-1：文件打开失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     */
+    int ftp_append(char* s, char* d)
+    {
+        return ftp_append(clientSocket, s, d);
     }
 
 private:
@@ -172,12 +216,14 @@ private:
         if (WSAStartup(socketVersion, &wsaData))
         {
             printf("Init socket dll error!");
-            exit(1);
+            return -1;
         }
 
         struct hostent* server = gethostbyname(host);
         if (!server)
+        {
             return -1;
+        }
         unsigned char ch[4];
         char ip[20];
         //一个hostname 可以对应多个ip
@@ -190,10 +236,10 @@ private:
 
         //创建Socket
         SOCKET s = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
-        if (SOCKET_ERROR == s)
+        if (s == SOCKET_ERROR)
         {
             printf("Create Socket Error!");
-            exit(1);
+            return -1;
         }
         //设置超时连接
         int timeout = 3000; //复杂的网络环境要设置超时判断
@@ -205,19 +251,22 @@ private:
         address.sin_addr.S_un.S_addr = inet_addr(ip);
         address.sin_port = htons((unsigned short)port);
         //连接
-        if (SOCKET_ERROR == connect(s, (LPSOCKADDR)&address, sizeof(address)))
+        if (connect(s, (LPSOCKADDR)&address, sizeof(address)) == SOCKET_ERROR)
         {
             printf("Can Not Connect To Server IP!\n");
-            exit(1);
+            return -1;
         }
-        return s;
+        else
+        {
+            return s;
+        }
     }
 
     /**
      * @brief 连接到FTP服务器
      * @param 服务器ip或域名
      * @param 端口号
-     * @return SOCKET
+     * @return SOCKET，-1：服务器连接失败
      */
     SOCKET connect_server(char* host, int port)
     {
@@ -227,7 +276,7 @@ private:
         SSIZE_T len;
 
         ctrl_sock = socket_connect(host, port);
-        if (-1 == ctrl_sock)
+        if (ctrl_sock == -1)
         {
             return -1;
         }
@@ -240,13 +289,16 @@ private:
 
         sscanf(buf, "%d", &result);
 
-        if (FTP_SERVICE_READY != result)
+        if (result == FTP_SERVICE_READY)
+        {
+            return ctrl_sock;
+        }
+        else
         {
             printf("FTP Not ready, Close the socet.");
             closesocket(ctrl_sock); //关闭Socket
             return -1;
         }
-        return ctrl_sock;
     }
 
     /**
@@ -267,12 +319,18 @@ private:
         }
         r_len = recv(sock, buf, BUFSIZE, 0);
         if (r_len < 1)
+        {
             return -1;
+        }
         buf[r_len] = 0;
-        if (nullptr != len)
+        if (len != nullptr)
+        {
             *len = r_len;
-        if (nullptr != re_buf)
+        }
+        if (re_buf != nullptr)
+        {
             sprintf(re_buf, "%s", buf);
+        }
         return 0;
     }
 
@@ -290,9 +348,33 @@ private:
         printf("FTP Client: %s", cmd);
         result = ftp_sendcmd_re(sock, cmd, buf, &len);
         printf("FTP Server: %s", buf);
-        if (0 == result)
+        if (result == 0)
         {
             sscanf(buf, "%d", &result);
+        }
+        return result;
+    }
+
+    /**
+     * @brief send发送命令
+     * @param SOCKET
+     * @param 命令
+     * @param 服务器根据命令返回的结果
+     * @return FTP响应码
+     */
+    int ftp_sendcmd(SOCKET sock, char* cmd, string &ans)
+    {
+        char buf[BUFSIZE];
+        int result;
+        string s;
+        SSIZE_T len;
+        printf("FTP Client: %s", cmd);
+        result = ftp_sendcmd_re(sock, cmd, buf, &len);
+        printf("FTP Server: %s", buf);
+        if (result == 0)
+        {
+            sscanf(strtok(buf, " "), "%d", &result);
+            ans = strtok(NULL, " ");
         }
         return result;
     }
@@ -313,13 +395,15 @@ private:
         int timeout = 0;
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
         result = ftp_sendcmd(sock, buf);
-        if (FTP_LOGIN_SUCCESS == result) //直接登录
+        if (result == FTP_LOGIN_SUCCESS) //直接登录
+        {
             return 0;
-        else if (FTP_PASSWORD_REQUIREd == result) //需要密码
+        }
+        else if (result == FTP_PASSWORD_REQUIRED) //需要密码
         {
             sprintf(buf, "PASS %s\r\n", pwd);
             result = ftp_sendcmd(sock, buf);
-            if (FTP_LOGIN_SUCCESS == result)
+            if (result == FTP_LOGIN_SUCCESS)
             {
                 return 0;
             }
@@ -368,10 +452,33 @@ private:
     {
         char buf[BUFSIZ];
         sprintf(buf, "TYPE %c\r\n", mode);
-        if (FTP_SUCCESS != ftp_sendcmd(sock, buf))
-            return -1;
-        else
+        if (ftp_sendcmd(sock, buf) == FTP_SUCCESS)
+        {
             return 0;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+
+    /**
+     * @brief 无动作，告知服务器保持连接 NOOP
+     * @param SOCKET
+     * @return 0：成功，-1：失败
+     */
+    int ftp_noop(SOCKET sock)
+    {
+        char buf[BUFSIZ];
+        sprintf(buf, "NOOP\r\n");
+        if (ftp_sendcmd(sock, buf) == FTP_SUCCESS)
+        {
+            return 0;
+        }
+        else
+        {
+            return -1;
+        }
     }
 
     /**
@@ -386,10 +493,14 @@ private:
         int result;
         sprintf(buf, "CWD %s\r\n", path);
         result = ftp_sendcmd(sock, buf);
-        if (FTP_FILE_ACTION_COMPLETE != result)  //250 文件行为完成
-            return -1;
-        else
+        if (result == FTP_FILE_ACTION_COMPLETE)  //250 文件行为完成
+        {
             return 0;
+        }
+        else
+        {
+            return -1;
+        }
     }
 
     /**
@@ -402,10 +513,14 @@ private:
         int result;
         char* c = const_cast<char*>("CDUP\r\n");
         result = ftp_sendcmd(sock, c);
-        if (FTP_FILE_ACTION_COMPLETE == result || FTP_SUCCESS == result)
+        if (result == FTP_FILE_ACTION_COMPLETE || result == FTP_SUCCESS)
+        {
             return 0;
+        }
         else
+        {
             return result;
+        }
     }
 
     /**
@@ -420,10 +535,14 @@ private:
         int result;
         sprintf(buf, "MKD %s\r\n", path);
         result = ftp_sendcmd(sock, buf);
-        if (FTP_FILE_CREATED != result) //257 路径名建立
+        if (result != FTP_FILE_CREATED) //257 路径名建立
+        {
             return result; //550 目录已存在
+        }
         else
+        {
             return 0;
+        }
     }
 
     /**
@@ -448,17 +567,47 @@ private:
         if (send_result == 0)
         {
             sscanf(result_buf, "%*[^(](%d,%d,%d,%d,%d,%d)",
-                   &addr[0], &addr[1], &addr[2], &addr[3],
-                    &addr[4], &addr[5]);
+                &addr[0], &addr[1], &addr[2], &addr[3],
+                &addr[4], &addr[5]);
         }
 
         //连接PASV端口
         memset(buf, 0, sizeof(buf));
         sprintf(buf, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
         r_sock = socket_connect(buf, addr[4] * 256 + addr[5]);
-        if (-1 == r_sock)
+        if (r_sock == -1)
+        {
             return -1;
-        return r_sock;
+        }
+        else
+        {
+            return r_sock;
+        }
+    }
+
+    /**
+     * @brief 显示当前工作目录 PWD
+     * @param SOCKET
+     * @param 当前工作目录
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_pwd(SOCKET c_sock, string &path)
+    {
+        char buf[BUFSIZE];
+        SSIZE_T len, buf_len, total_len;
+        int result;
+
+        // 发送PWD命令
+        char* c = const_cast<char*>("PWD\r\n");
+        result = ftp_sendcmd(c_sock, c, path);
+        if (result == FTP_FILE_CREATED)
+        {
+            return 0;
+        }
+        else
+        {
+            return result;
+        }
     }
 
     /**
@@ -466,60 +615,76 @@ private:
      * @param SOCKET
      * @param 相对路径或绝对路径
      * @param 列表信息
-     * @param 列表信息大小
      * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
      */
-    int ftp_list(SOCKET c_sock, char* path, char** data, int* data_len)
+    int ftp_list(SOCKET c_sock, char* path, string &data)
     {
         SOCKET r_sock;
         char buf[BUFSIZE];
         int send_re;
         int result;
-        SSIZE_T len, buf_len, total_len;
+        SSIZE_T len;
 
-        //连接到PASV接口
+        // 连接到PASV接口
         r_sock = ftp_pasv_connect(c_sock);
-        if (-1 == r_sock)
+        if (r_sock == -1)
         {
             return -1;
         }
-        //发送LIST命令
+        // 发送LIST命令
         memset(buf, 0, sizeof(buf));
         sprintf(buf, "LIST %s\r\n", path);
         send_re = ftp_sendcmd(c_sock, buf);
-        if (send_re >= 300 || send_re == 0)
+        if (send_re != FTP_DATA_CONNECTION_OPEN)
+        {
             return send_re;
-        len = total_len = 0;
-        buf_len = BUFSIZE;
-        char* re_buf = (char*)malloc(buf_len);
+        }
+        // 接收数据
         while ((len = recv(r_sock, buf, BUFSIZE, 0)) > 0)
         {
-            if (total_len + len > buf_len)
-            {
-                buf_len *= 2;
-                char* re_buf_n = (char*)malloc(buf_len);
-                memcpy(re_buf_n, re_buf, total_len);
-                free(re_buf);
-                re_buf = re_buf_n;
-            }
-            memcpy(re_buf + total_len, buf, len);
-            total_len += len;
+            data.append(buf);
         }
         closesocket(r_sock);
 
-        //向服务器接收返回值
+        // 向服务器接收返回值
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
         buf[len] = 0;
         sscanf(buf, "%d", &result);
-        if (result != 226)
+        if (result == FTP_DATA_CONNECTION_CLOSE)
         {
-            free(re_buf);
+            return 0;
+        }
+        else
+        {
             return result;
         }
-        *data = re_buf;
-        *data_len = total_len;
-        return 0;
+    }
+
+    /**
+     * @brief 获取文件大小 SIZE
+     * @param SOCKET
+     * @param 相对路径或绝对路径
+     * @param 文件大小
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_filesize(SOCKET sock, char* filename, long& size)
+    {
+        char buf[BUFSIZE];
+        string ans;
+        int result;
+        sprintf(buf, "SIZE %s\r\n", filename);
+        result = ftp_sendcmd(sock, buf, ans);
+        size = atoi(ans.c_str());
+
+        if (result == FTP_FILE_STATUS)
+        {
+            return 0;
+        }
+        else
+        {
+            return result;
+        }
     }
 
     /**
@@ -534,13 +699,14 @@ private:
         int result;
         sprintf(buf, "RMD %s\r\n", path);
         result = ftp_sendcmd(sock, buf);
-        if (FTP_FILE_ACTION_COMPLETE != result)
+        if (result == FTP_FILE_ACTION_COMPLETE) //250 File deleted successfully
         {
-            //550 Directory not empty.
-            //550 Directory not found.
+            return 0;
+        }
+        else
+        {
             return result;
         }
-        return 0;
     }
 
     /**
@@ -555,12 +721,14 @@ private:
         int result;
         sprintf(buf, "DELE %s\r\n", filename);
         result = ftp_sendcmd(sock, buf);
-        if (FTP_FILE_ACTION_COMPLETE != 250) //250 File deleted successfully
+        if (result == FTP_FILE_ACTION_COMPLETE) //250 File deleted successfully
         {
-            //550 File not found.
+            return 0;
+        }
+        else
+        {
             return result;
         }
-        return 0;
     }
 
     /**
@@ -576,129 +744,54 @@ private:
         int result;
         sprintf(buf, "RNFR %s\r\n", s);
         result = ftp_sendcmd(sock, buf);
-        if (350 != result) //350 文件行为暂停，因为要进行移动操作
+        if (result != FTP_FILE_ACTION_PAUSE) //350 文件行为暂停，因为要进行移动操作
+        {
             return result;
+        }
         sprintf(buf, "RNTO %s\r\n", d);
         result = ftp_sendcmd(sock, buf);
-        if (FTP_FILE_ACTION_COMPLETE != result)
+        if (result == FTP_FILE_ACTION_COMPLETE)
+        {
+            return 0;
+        }
+        else
         {
             return result;
         }
-        return 0;
     }
 
     /**
-     * @brief 从服务器复制文件到本地 TYPE PASV RETR
+     * @brief 从服务器复制文件到本地（断点上传） TYPE PASV REST RETR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
-     * @param 文件大小
      * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_server2local(SOCKET c_sock, char* s, char* d, int* size)
+    int ftp_download(SOCKET c_sock, char* s, char* d)
     {
         SOCKET d_sock;
         SSIZE_T len, write_len;
-        char buf[BUFSIZ];
+        char buf[BUFSIZE];
         int result;
-        *size = 0;
-        //打开本地文件
-        FILE* fp = fopen(d, "wb");
-        if (nullptr == fp)
-        {
-            printf("Can't Open the file.\n");
-            return -1;
-        }
-        //设置传输模式
-        ftp_type(c_sock, 'I');
-
-        //连接到PASV接口 用于传输文件
-        d_sock = ftp_pasv_connect(c_sock);
-        if (-1 == d_sock)
-        {
-            fclose(fp); //关闭文件
-            return -2;
-        }
-
-        //发送RETR命令
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "RETR %s\r\n", s);
-        result = ftp_sendcmd(c_sock, buf);
-        // 150 Opening data channel for file download from server of "xxxx"
-        if (result >= 300 || result == 0) //失败可能是没有权限什么的，具体看响应码
-        {
-            fclose(fp);
-            return result;
-        }
-
-        //开始向PASV读取数据(下载)
-        memset(buf, 0, sizeof(buf));
-        while ((len = recv(d_sock, buf, BUFSIZE, 0)) > 0)
-        {
-            write_len = fwrite(&buf, len, 1, fp);
-            if (write_len != 1) //写入文件不完整
-            {
-                closesocket(d_sock); //关闭套接字
-                fclose(fp); //关闭文件
-                return -1;
-            }
-            if (nullptr != size)
-            {
-                *size += write_len;
-            }
-        }
-        //下载完成
-        closesocket(d_sock);
-        fclose(fp);
-
-        //向服务器接收返回值
-        memset(buf, 0, sizeof(buf));
-        len = recv(c_sock, buf, BUFSIZE, 0);
-        buf[len] = 0;
-        printf("%s\n", buf);
-        sscanf(buf, "%d", &result);
-        if (result >= 300)
-        {
-            return result;
-        }
-        //226 Successfully transferred "xxxx"
-        return 0;
-    }
-
-    /**
-     * @brief 从服务器复制文件到本地（支持断点续传） TYPE PASV REST RETR
-     * @param SOCKET
-     * @param 源地址
-     * @param 目的地址
-     * @param 文件大小
-     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
-     */
-    int ftp_download(SOCKET c_sock, char* s, char* d, int* size)
-    {
-        SOCKET d_sock;
-        SSIZE_T len, write_len;
-        char buf[BUFSIZ];
-        int result;
-        long download_size;
-        *size = 0;
+        long downloaded_size;
 
         // 打开本地文件
         FILE* fp = fopen(d, "ab+");
-        if (nullptr == fp)
+        if (fp == nullptr)
         {
             printf("Can't Open the file.\n");
             return -1;
         }
 
         // 获取文件已下载的字节数
-        download_size = filelength(fileno(fp));
+        downloaded_size = _filelength(_fileno(fp));
 
         // 设置传输模式TYPE
         ftp_type(c_sock, 'I');
 
         // 连接到PASV接口用于传输文件
         d_sock = ftp_pasv_connect(c_sock);
-        if (-1 == d_sock)
+        if (d_sock == -1)
         {
             fclose(fp);
             return -2;
@@ -706,9 +799,9 @@ private:
 
         // 发送REST命令
         memset(buf, 0, sizeof(buf));
-        sprintf(buf, "REST %ld\r\n", download_size + 1);
+        sprintf(buf, "REST %ld\r\n", downloaded_size);
         result = ftp_sendcmd(c_sock, buf);
-        if (result >= 300 || result == 0)
+        if (result != FTP_FILE_ACTION_PAUSE)
         {
             fclose(fp);
             return result;
@@ -719,7 +812,7 @@ private:
         sprintf(buf, "RETR %s\r\n", s);
         result = ftp_sendcmd(c_sock, buf);
         // 150 Opening data channel for file download from server of "xxxx"
-        if (result >= 300 || result == 0) // 失败可能是没有权限什么的，具体看响应码
+        if (result != FTP_DATA_CONNECTION_OPEN)
         {
             fclose(fp);
             return result;
@@ -736,10 +829,6 @@ private:
                 fclose(fp); // 关闭文件
                 return -1;
             }
-            if (nullptr != size)
-            {
-                *size += write_len;
-            }
         }
         // 下载完成
         closesocket(d_sock);
@@ -751,58 +840,63 @@ private:
         buf[len] = 0;
         printf("%s\n", buf);
         sscanf(buf, "%d", &result);
-        if (result >= 300)
+        if (result == FTP_DATA_CONNECTION_CLOSE)
+        {
+            return 0;
+        }
+        else
         {
             return result;
         }
-        // 226 Successfully transferred "xxxx"
-        return 0;
     }
 
     /**
-     * @brief 从本地复制文件到服务器 TYPE PASV STOR
+     * @brief 从本地上传文件到服务器（替换） TYPE PASV STOR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
-     * @param 文件大小
-     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     * @return 0：成功，-1：文件打开失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_local2server(SOCKET c_sock, char* s, char* d, int* size)
+    int ftp_replace(SOCKET c_sock, char* s, char* d)
     {
         SOCKET d_sock;
-        SSIZE_T len, send_len;
+        SSIZE_T len, send_len, total_len = 0;
         char buf[BUFSIZE];
         FILE* fp;
-        int send_re;
-        int result;
-        //打开本地文件
+        int send_re, result;
+        long file_size;
+        // 打开本地文件
         fp = fopen(s, "rb");
-        if (nullptr == fp)
+        if (fp == nullptr)
         {
             printf("Can't Not Open the file.\n");
             return -1;
         }
-        //设置传输模式
+
+        // 获取本地文件大小
+        file_size = _filelength(_fileno(fp));
+
+        // 设置传输模式
         ftp_type(c_sock, 'I');
-        //连接到PASV接口
+        // 连接到PASV接口
         d_sock = ftp_pasv_connect(c_sock);
         if (d_sock == -1)
         {
             fclose(fp);
-            return -1;
+            return -2;
         }
 
-        //发送STOR命令
+        // 发送STOR命令
         memset(buf, 0, sizeof(buf));
         sprintf(buf, "STOR %s\r\n", d);
         send_re = ftp_sendcmd(c_sock, buf);
-        if (send_re >= 300 || send_re == 0)
+        if (send_re != FTP_DATA_CONNECTION_OPEN)
         {
             fclose(fp);
             return send_re;
         }
 
-        //开始向PASV通道写数据
+        // 开始向PASV通道写数据
         memset(buf, 0, sizeof(buf));
         while ((len = fread(buf, 1, BUFSIZE, fp)) > 0)
         {
@@ -813,52 +907,126 @@ private:
                 fclose(fp);
                 return -1;
             }
-            if (nullptr != size)
-            {
-                *size += send_len;
-            }
+            total_len += len;
         }
-        //完成上传
+
+        // 完成上传
         closesocket(d_sock);
         fclose(fp);
-
+        //printf("发送长度：%d", total_len);
         //向服务器接收响应码
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
         buf[len] = 0;
         sscanf(buf, "%d", &result);
-        if (result >= 300)
+        if (result == FTP_DATA_CONNECTION_CLOSE)
+        {
+            return 0;
+        }
+        else
         {
             return result;
         }
-        return 0;
     }
 
     /**
-     * @brief 获取一行响应码
+     * @brief 从本地上传文件到服务器（追加） TYPE PASV SIZE APPE
      * @param SOCKET
-     * @param 命令返回码-命令返回描述
-     * @param 命令返回字节数
-     * @return 0：发送成功，-1：发送失败
+     * @param 源地址
+     * @param 目的地址
+     * @return 0：成功，-1：文件打开失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_recv(SOCKET sock, char* re_buf, SSIZE_T* len)
+    int ftp_append(SOCKET c_sock, char* s, char* d)
     {
+        SOCKET d_sock;
+        SSIZE_T len, send_len;
         char buf[BUFSIZE];
-        SSIZE_T r_len;
-        int timeout = 3000;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
-        r_len = recv(sock, buf, BUFSIZE, 0);
-        timeout = 0;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
-        if (r_len < 1)
+        FILE* fp;
+        int send_re, result;
+        long uploaded_size, file_size;
+
+        // 打开本地文件
+        fp = fopen(s, "rb");
+        if (fp == nullptr)
+        {
+            printf("Can't Not Open the file.\n");
             return -1;
-        buf[r_len] = 0;
-        if (nullptr != len)
-            *len = r_len;
-        if (nullptr != re_buf)
-            sprintf(re_buf, "%s", buf);
-        return 0;
+        }
+
+        // 设置传输模式
+        ftp_type(c_sock, 'I');
+
+        // 连接到PASV接口
+        d_sock = ftp_pasv_connect(c_sock);
+        if (d_sock == -1)
+        {
+            fclose(fp);
+            return -2;
+        }
+
+        // 获取已上传文件大小
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "APPE %s\r\n", d);
+        send_re = ftp_filesize(c_sock, d, uploaded_size);
+        if (send_re != 0)
+        {
+            fclose(fp);
+            return send_re;
+        }
+
+        // 获取本地文件大小
+        file_size = _filelength(_fileno(fp));
+
+        // 设置文件指针偏移
+        if (file_size <= uploaded_size)
+        {
+            fclose(fp);
+            return 0;
+        }
+        else
+        {
+            fseek(fp, uploaded_size, SEEK_SET);
+        }
+
+        // 发送APPE命令
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "APPE %s\r\n", d);
+        send_re = ftp_sendcmd(c_sock, buf);
+        if (send_re != FTP_DATA_CONNECTION_OPEN)
+        {
+            fclose(fp);
+            return send_re;
+        }
+
+        // 开始向PASV通道写数据
+        memset(buf, 0, sizeof(buf));
+        while ((len = fread(buf, 1, BUFSIZE, fp)) > 0)
+        {
+            send_len = send(d_sock, buf, len, 0);
+            if (send_len != len)
+            {
+                closesocket(d_sock);
+                fclose(fp);
+                return -1;
+            }
+        }
+        // 完成上传
+        closesocket(d_sock);
+        fclose(fp);
+
+        // 向服务器接收响应码
+        memset(buf, 0, sizeof(buf));
+        len = recv(c_sock, buf, BUFSIZE, 0);
+        buf[len] = 0;
+        sscanf(buf, "%d", &result);
+        if (result == FTP_DATA_CONNECTION_CLOSE)
+        {
+            return 0;
+        }
+        else
+        {
+            return result;
+        }
     }
 };
-
 #endif // FTPAPI_H
