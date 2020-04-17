@@ -108,7 +108,7 @@ public:
      * @param 当前工作目录
      * @return 0：正常操作返回，其他：服务器返回错误码
      */
-    int ftp_pwd(string &path)
+    int ftp_pwd(char* path)
     {
         return ftp_pwd(clientSocket, path);
     }
@@ -119,7 +119,7 @@ public:
      * @param 列表信息
      * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
      */
-    int ftp_list(char* path, string &data)
+    int ftp_list(char* path, char* data)
     {
         return ftp_list(clientSocket, path, data);
     }
@@ -363,7 +363,7 @@ private:
      * @param 服务器根据命令返回的结果
      * @return FTP响应码
      */
-    int ftp_sendcmd(SOCKET sock, char* cmd, string &ans)
+    int ftp_sendcmd(SOCKET sock, char* cmd, char* ans)
     {
         char buf[BUFSIZE];
         int result;
@@ -375,7 +375,7 @@ private:
         if (result == 0)
         {
             sscanf(strtok(buf, " "), "%d", &result);
-            ans = strtok(NULL, " ");
+            strcpy(ans, strtok(nullptr, " "));
         }
         return result;
     }
@@ -421,9 +421,8 @@ private:
 
     /**
      * @brief winsock使用后，要调用WSACleanup函数关闭网络设备，以便释放其占用的资源
-     * @param SOCKET
      */
-    void socket_close(int c_sock)
+    void socket_close()
     {
         WSACleanup();
     }
@@ -439,7 +438,7 @@ private:
         char* c = const_cast<char*>("QUIT\r\n");
         result = ftp_sendcmd(sock, c);
         closesocket(sock);
-        socket_close(sock);
+        socket_close();
         return result;
     }
 
@@ -592,10 +591,8 @@ private:
      * @param 当前工作目录
      * @return 0：成功，其他：服务器返回错误码
      */
-    int ftp_pwd(SOCKET c_sock, string &path)
+    int ftp_pwd(SOCKET c_sock, char* path)
     {
-        char buf[BUFSIZE];
-        SSIZE_T len, buf_len, total_len;
         int result;
 
         // 发送PWD命令
@@ -618,13 +615,14 @@ private:
      * @param 列表信息
      * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
      */
-    int ftp_list(SOCKET c_sock, char* path, string &data)
+    int ftp_list(SOCKET c_sock, char* path, char* data)
     {
         SOCKET r_sock;
         char buf[BUFSIZE];
         int send_re;
         int result;
         SSIZE_T len;
+        string rec_data;
 
         // 连接到PASV接口
         r_sock = ftp_pasv_connect(c_sock);
@@ -643,8 +641,9 @@ private:
         // 接收数据
         while ((len = recv(r_sock, buf, BUFSIZE, 0)) > 0)
         {
-            data.append(buf);
+            rec_data.append(buf);
         }
+        strcpy(data, rec_data.c_str());
         closesocket(r_sock);
 
         // 向服务器接收返回值
@@ -672,11 +671,12 @@ private:
     int ftp_filesize(SOCKET sock, char* filename, long& size)
     {
         char buf[BUFSIZE];
-        string ans;
+        char ans[BUFSIZE];
         int result;
         sprintf(buf, "SIZE %s\r\n", filename);
         result = ftp_sendcmd(sock, buf, ans);
-        size = atoi(ans.c_str());
+
+        size = atoi(const_cast<char*>(ans));
 
         if (result == FTP_FILE_STATUS)
         {
