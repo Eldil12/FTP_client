@@ -639,6 +639,7 @@ private:
             return send_re;
         }
         // 接收数据
+		memset(buf, 0, sizeof(buf));
         while ((len = recv(r_sock, buf, BUFSIZE, 0)) > 0)
         {
             rec_data.append(buf);
