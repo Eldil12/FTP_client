@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <winsock2.h>
+#include <QDebug>
 
 using namespace std;
 
@@ -216,7 +217,7 @@ private:
         WORD socketVersion = MAKEWORD(2, 0);
         if (WSAStartup(socketVersion, &wsaData))
         {
-            printf("Init socket dll error!");
+            qDebug() << "Init socket dll error!";
             return -1;
         }
 
@@ -239,7 +240,7 @@ private:
         SOCKET s = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (s == SOCKET_ERROR)
         {
-            printf("Create Socket Error!");
+            qDebug() << "Create Socket Error!";
             return -1;
         }
         //设置超时连接
@@ -254,7 +255,7 @@ private:
         //连接
         if (connect(s, (LPSOCKADDR)&address, sizeof(address)) == SOCKET_ERROR)
         {
-            printf("Can Not Connect To Server IP!\n");
+            qDebug() << "Can Not Connect To Server IP!\n";
             return -1;
         }
         else
@@ -285,7 +286,7 @@ private:
         while ((len = recv(ctrl_sock, buf, BUFSIZE, 0)) > 0)
         {
             buf[len] = 0;
-            printf("%s\n", buf); //220-FileZilla Server version 0.9.43 beta
+            qDebug() << buf; //220-FileZilla Server version 0.9.43 beta
         }
 
         sscanf(buf, "%d", &result);
@@ -296,7 +297,7 @@ private:
         }
         else
         {
-            printf("FTP Not ready, Close the socet.");
+            qDebug() << "FTP Not ready, Close the socet.";
             closesocket(ctrl_sock); //关闭Socket
             return -1;
         }
@@ -346,9 +347,9 @@ private:
         char buf[BUFSIZE];
         int result;
         SSIZE_T len;
-        printf("FTP Client: %s", cmd);
+        qDebug() << "FTP Client: " << cmd;
         result = ftp_sendcmd_re(sock, cmd, buf, &len);
-        printf("FTP Server: %s", buf);
+        qDebug() << "FTP Server: " << buf;
         if (result == 0)
         {
             sscanf(buf, "%d", &result);
@@ -369,9 +370,9 @@ private:
         int result;
         string s;
         SSIZE_T len;
-        printf("FTP Client: %s", cmd);
+        qDebug() << "FTP Client: " << cmd;
         result = ftp_sendcmd_re(sock, cmd, buf, &len);
-        printf("FTP Server: %s", buf);
+        qDebug() << "FTP Server: " << buf;
         if (result == 0)
         {
             sscanf(strtok(buf, " "), "%d", &result);
@@ -781,7 +782,7 @@ private:
         FILE* fp = fopen(d, "ab+");
         if (fp == nullptr)
         {
-            printf("Can't Open the file.\n");
+            qDebug() << "Can't Open the file.";
             return -1;
         }
 
@@ -840,7 +841,7 @@ private:
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
         buf[len] = 0;
-        printf("%s\n", buf);
+        qDebug() << buf;
         sscanf(buf, "%d", &result);
         if (result == FTP_DATA_CONNECTION_CLOSE)
         {
@@ -871,7 +872,7 @@ private:
         fp = fopen(s, "rb");
         if (fp == nullptr)
         {
-            printf("Can't Not Open the file.\n");
+            qDebug() << "Can't Not Open the file";
             return -1;
         }
 
@@ -950,7 +951,7 @@ private:
         fp = fopen(s, "rb");
         if (fp == nullptr)
         {
-            printf("Can't Not Open the file.\n");
+            qDebug() << "Can't Not Open the file.";
             return -1;
         }
 

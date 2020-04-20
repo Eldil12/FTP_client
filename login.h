@@ -27,6 +27,8 @@ public:
     Login(FTPAPI ftpAPI, QWidget *parent = nullptr);
     ~Login();
 
+    static char *string2char(QString s);
+
 private slots:
     void on_pushButton_Login_clicked();
 
@@ -34,7 +36,5 @@ private:
     Ui::Login *ui;
 
     FTPAPI ftpAPI;
-
-    char *string2char(QString s);
 };
 #endif // LOGIN_H

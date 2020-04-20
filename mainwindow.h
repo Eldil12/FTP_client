@@ -2,11 +2,14 @@
 #define MAINWINDOW_H
 
 #include <QDir>
+#include <QDebug>
 #include <QMainWindow>
+#include <QPushButton>
 #include <QListWidgetItem>
 #include <QStandardItemModel>
 
 #include "ftpapi.h"
+#include "login.h"
 
 QT_BEGIN_NAMESPACE
     namespace Ui {
@@ -26,6 +29,7 @@ private slots:
     void slot_enterSubDir(QListWidgetItem *);
     void slot_listAllFile(QDir);
     void slot_showFileDetail(QListWidgetItem *);
+    void slot_upload2host();
 
 private:
     Ui::MainWindow *ui;
