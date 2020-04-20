@@ -35,6 +35,11 @@ private slots:
 
     void slot_upload2host();
     void slot_download2local();
+    void slot_deleteFileFromHost();
+
+    void on_pushButton_NewFolder_clicked();
+
+    void on_pushButton_PreFolder_clicked();
 
 private:
     Ui::MainWindow *ui;
@@ -43,6 +48,8 @@ private:
 
     QString host;
     QString user;
+
+    void fresh();
 };
 
 #endif // MAINWINDOW_H

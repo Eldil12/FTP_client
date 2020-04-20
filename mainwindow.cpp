@@ -10,8 +10,6 @@ MainWindow::MainWindow(FTPAPI ftpAPI, QString host, QString user, QWidget *paren
     ui->label_Infomation->setText("当前主机：" + host + "\t当前用户：" + user);
     ui->lineEdit_LocalFile->setText(QCoreApplication::applicationDirPath());
 
-
-
     /* 列出本地文件列表 */
     QDir root(ui->lineEdit_LocalFile->text());
     slot_listAllFile(root);
@@ -27,12 +25,11 @@ MainWindow::MainWindow(FTPAPI ftpAPI, QString host, QString user, QWidget *paren
             this,                     SLOT  (slot_enterSubDir (QListWidgetItem *)));
 
     /* 拉取主机文件列表 */
-    char data[BUFSIZE];
-    ftpAPI.ftp_list("./", data);
-    QStringList hostList = QObject::tr(data).simplified().split(" ");
-    qDebug() << hostList;
-
     ui->lineEdit_HostFile->setText("./");
+
+    char data[BUFSIZE];
+    ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+    QStringList hostList = QObject::tr(data).simplified().split(" ");
 
     for (QString s : hostList) {
         ui->listWidget_HostFile->addItem(new QListWidgetItem(s));
@@ -59,9 +56,24 @@ void MainWindow::slot_enterSubDir(QListWidgetItem *item) {
     slot_listAllFile(dir.absolutePath());
 }
 
-void MainWindow::slot_enterHostSubDir(QListWidgetItem *)
+void MainWindow::slot_enterHostSubDir(QListWidgetItem *item)
 {
+    QString name = ui->lineEdit_HostFile->text() + item->text();
+    long size;
+    ftpAPI.ftp_filesize(Login::string2char(name), size);
 
+    if (size < 0) {
+        ui->listWidget_HostFile->clear();
+        ui->lineEdit_HostFile->setText(name + "/");
+
+        char data[BUFSIZE];
+        ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+        QStringList hostList = QObject::tr(data).simplified().split(" ");
+
+        for (QString s : hostList) {
+            ui->listWidget_HostFile->addItem(new QListWidgetItem(s));
+        }
+    }
 }
 
 void MainWindow::slot_listAllFile(QDir dir) {
@@ -115,7 +127,7 @@ void MainWindow::slot_showFileDetail(QListWidgetItem *item) {
 void MainWindow::slot_showHostFileDetail(QListWidgetItem *item)
 {
     QStandardItemModel *model = new QStandardItemModel();
-    QStringList labels = QObject::tr("本地/远程,文件名,文件大小,文件路径, ").simplified().split(",");
+    QStringList labels = QObject::tr("本地/远程,文件名,文件大小,文件路径, , ").simplified().split(",");
     model->setHorizontalHeaderLabels(labels);
 
     QStandardItem *newItem = new QStandardItem(QString("远程"));
@@ -134,27 +146,75 @@ void MainWindow::slot_showHostFileDetail(QListWidgetItem *item)
 
     ui->tableView_FileDetail->setModel(model);
 
-    QPushButton *downloadButton = new QPushButton("下载到本地");
-    downloadButton->setProperty("path", ui->lineEdit_HostFile->text());
-    downloadButton->setProperty("name", item->text());
+    if (size >= 0) {
 
-    connect(downloadButton, SIGNAL(clicked(bool)), this, SLOT(slot_download2local()));
-    ui->tableView_FileDetail->setIndexWidget(model->index(0, 4), downloadButton);
+        QPushButton *downloadButton = new QPushButton("下载到本地");
+        downloadButton->setProperty("path", ui->lineEdit_HostFile->text());
+        downloadButton->setProperty("name", item->text());
+        connect(downloadButton, SIGNAL(clicked(bool)), this, SLOT(slot_download2local()));
+        ui->tableView_FileDetail->setIndexWidget(model->index(0, 4), downloadButton);
+
+        QPushButton *deleteButton = new QPushButton("从主机删除");
+        deleteButton->setProperty("path", ui->lineEdit_HostFile->text());
+        deleteButton->setProperty("name", item->text());
+        connect(deleteButton, SIGNAL(clicked(bool)), this, SLOT(slot_deleteFileFromHost()));
+        ui->tableView_FileDetail->setIndexWidget(model->index(0, 5), deleteButton);
+
+    }
 }
 
 void MainWindow::slot_upload2host()
 {
     QPushButton *b = (QPushButton *)sender();
-
-    qDebug() << Login::string2char(b->property("path").toString()+"/"+b->property("name").toString());
     ftpAPI.ftp_append(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
                       Login::string2char(ui->lineEdit_HostFile->text()+b->property("name").toString()));
+    fresh();
 }
 
 void MainWindow::slot_download2local()
 {
     QPushButton *b = (QPushButton *)sender();
-    qDebug() << Login::string2char(b->property("path").toString()+"/"+b->property("name").toString());
     ftpAPI.ftp_download(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
                         Login::string2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()));
+    fresh();
+}
+
+void MainWindow::slot_deleteFileFromHost()
+{
+    QPushButton *b = (QPushButton *)sender();
+    ftpAPI.ftp_deletefile(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()));
+    fresh();
+}
+
+void MainWindow::fresh()
+{
+    ui->listWidget_HostFile->clear();
+    ui->listWidget_LocalFile->clear();
+
+    QDir root(ui->lineEdit_LocalFile->text());
+    slot_listAllFile(root);
+
+    char data[BUFSIZE];
+    ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+    QStringList hostList = QObject::tr(data).simplified().split(" ");
+
+    for (QString s : hostList) {
+        ui->listWidget_HostFile->addItem(new QListWidgetItem(s));
+    }
+}
+
+void MainWindow::on_pushButton_NewFolder_clicked()
+{
+    QString newFolder = ui->lineEdit_HostFile->text() + ui->lineEdit_NewFolder->text() + "/";
+    ftpAPI.ftp_mkd(Login::string2char(newFolder));
+    fresh();
+}
+
+void MainWindow::on_pushButton_PreFolder_clicked()
+{
+    ftpAPI.ftp_cdup();
+    char path[BUFSIZE];
+    ftpAPI.ftp_cwd(path);
+    ui->lineEdit_HostFile->setText(path);
+    fresh();
 }

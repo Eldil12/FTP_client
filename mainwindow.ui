@@ -83,9 +83,9 @@
     <property name="geometry">
      <rect>
       <x>545</x>
-      <y>159</y>
+      <y>209</y>
       <width>530</width>
-      <height>451</height>
+      <height>401</height>
      </rect>
     </property>
    </widget>
@@ -134,7 +134,7 @@
      <rect>
       <x>620</x>
       <y>110</y>
-      <width>455</width>
+      <width>331</width>
       <height>40</height>
      </rect>
     </property>
@@ -177,6 +177,67 @@
       <width>1070</width>
       <height>95</height>
      </rect>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit_NewFolder">
+    <property name="geometry">
+     <rect>
+      <x>545</x>
+      <y>160</y>
+      <width>401</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Arial</family>
+      <pointsize>10</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_NewFolder">
+    <property name="geometry">
+     <rect>
+      <x>960</x>
+      <y>160</y>
+      <width>111</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>新建文件夹</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_PreFolder">
+    <property name="geometry">
+     <rect>
+      <x>960</x>
+      <y>110</y>
+      <width>111</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>返回上一级</string>
     </property>
    </widget>
   </widget>
