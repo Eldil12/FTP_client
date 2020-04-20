@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <winsock2.h>
 #include <QDebug>
+#include <fstream>
+#include <thread>
 
 using namespace std;
 
@@ -801,11 +803,11 @@ private:
 		}
 		thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, d, (thread_num - 1) * section_size, file_size - (thread_num - 1) * section_size);
 		t.join();
-		return 0；
+        return 0;
 	}
 
 	/*
-	 * 创建指定大小的空文件,支持超大文件(16EB),小于4GB时, 
+	 * 创建指定大小的空文件,支持超大文件(16EB),小于4GB时, 
 	 * 参数dwHigh可传入0,
 	 * 成功返回0，失败返回错误代码
 	 */
@@ -936,7 +938,7 @@ private:
         char buf[BUFSIZE];
         FILE* fp;
         int send_re, result;
-        long file_size;
+
         // 打开本地文件
         fp = fopen(s, "rb");
         if (fp == nullptr)
@@ -944,9 +946,6 @@ private:
             qDebug() << "Can't Not Open the file";
             return -1;
         }
-
-        // 获取本地文件大小
-        file_size = _filelength(_fileno(fp));
 
         // 设置传输模式
         ftp_type(c_sock, 'I');
