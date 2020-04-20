@@ -26,10 +26,15 @@ public:
     ~MainWindow();
 
 private slots:
-    void slot_enterSubDir(QListWidgetItem *);
     void slot_listAllFile(QDir);
+    void slot_enterSubDir(QListWidgetItem *);
+    void slot_enterHostSubDir(QListWidgetItem *);
+
     void slot_showFileDetail(QListWidgetItem *);
+    void slot_showHostFileDetail(QListWidgetItem *);
+
     void slot_upload2host();
+    void slot_download2local();
 
 private:
     Ui::MainWindow *ui;
