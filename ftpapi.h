@@ -846,6 +846,7 @@ private:
 		fclose(fp1);
 		fclose(fp2);
 		delete[] temp;
+        return 0;
 	}
 
 	/**
