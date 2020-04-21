@@ -35,6 +35,8 @@ using namespace std;
 class FTPAPI
 {
 public:
+    int finish_num = 0; // 完成的线程数
+
     /**
      * @brief 连接并登录FTP服务器 USER PASS
      * @param 服务器ip
@@ -43,20 +45,25 @@ public:
      * @param 密码
      * @return 已连接到FTP服务器的socket，-1：连接远程主机失败，-2：用户名或密码错误
      */
-    int login_server(char* ip, int port, char* user, char* pwd)
+    int login_server(char* host, int port1, char* user, char* pwd)
     {
-        clientSocket = connect_server(ip, port);
-        if (clientSocket == -1)
+        strcpy(ip, host);
+        strcpy(user_name, user);
+        strcpy(password, pwd);
+        port = port1;
+
+        client_socket = connect_server(ip, port);
+        if (client_socket == -1)
         {
             return -1;
         }
-        if (login_server(clientSocket, user, pwd) == -1)
+        if (login_server(client_socket, user, pwd) == -1)
         {
-            closesocket(clientSocket);
+            closesocket(client_socket);
             return -2;
         }
 
-        return clientSocket;
+        return client_socket;
     }
 
     /**
@@ -65,7 +72,7 @@ public:
      */
     int ftp_quit()
     {
-        return ftp_quit(clientSocket);
+        return ftp_quit(client_socket);
     }
 
     /**
@@ -74,7 +81,7 @@ public:
      */
     int ftp_noop()
     {
-        return ftp_noop(clientSocket);
+        return ftp_noop(client_socket);
     }
 
     /**
@@ -84,7 +91,7 @@ public:
      */
     int ftp_cwd(char* path)
     {
-        return ftp_cwd(clientSocket, path);
+        return ftp_cwd(client_socket, path);
     }
 
     /**
@@ -93,7 +100,7 @@ public:
      */
     int ftp_cdup()
     {
-        return ftp_cdup(clientSocket);
+        return ftp_cdup(client_socket);
     }
 
     /**
@@ -103,7 +110,7 @@ public:
      */
     int ftp_mkd(char* path)
     {
-        return ftp_mkd(clientSocket, path);
+        return ftp_mkd(client_socket, path);
     }
 
     /**
@@ -113,7 +120,7 @@ public:
      */
     int ftp_pwd(char* path)
     {
-        return ftp_pwd(clientSocket, path);
+        return ftp_pwd(client_socket, path);
     }
 
     /**
@@ -124,7 +131,7 @@ public:
      */
     int ftp_list(char* path, char* data)
     {
-        return ftp_list(clientSocket, path, data);
+        return ftp_list(client_socket, path, data);
     }
 
     /**
@@ -135,7 +142,7 @@ public:
      */
     int ftp_filesize(char* filename, long& size)
     {
-        return ftp_filesize(clientSocket, filename, size);
+        return ftp_filesize(client_socket, filename, size);
     }
 
     /**
@@ -145,7 +152,7 @@ public:
      */
     int ftp_deletefolder(char* path)
     {
-        return ftp_deletefolder(clientSocket, path);
+        return ftp_deletefolder(client_socket, path);
     }
 
     /**
@@ -155,7 +162,7 @@ public:
      */
     int ftp_deletefile(char* filename)
     {
-        return ftp_deletefile(clientSocket, filename);
+        return ftp_deletefile(client_socket, filename);
     }
 
     /**
@@ -166,18 +173,19 @@ public:
      */
     int ftp_renamefile(char* s, char* d)
     {
-        return ftp_renamefile(clientSocket, s, d);
+        return ftp_renamefile(client_socket, s, d);
     }
 
     /**
      * @brief 从服务器复制文件到本地（多线程+断点上传） SIZE TYPE PASV REST RETR
      * @param 源地址
      * @param 目的地址
+     * @param FTPAPI对象
      * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
      */
-    int ftp_download(char* s, char* d)
+    int ftp_download(char* s, char* d, FTPAPI ftpapi)
     {
-        return ftp_download(clientSocket, s, d);
+        return ftp_download(client_socket, s, d, ftpapi);
     }
 
     /**
@@ -188,7 +196,7 @@ public:
      */
     int ftp_replace(char* s, char* d)
     {
-        return ftp_replace(clientSocket, s, d);
+        return ftp_replace(client_socket, s, d);
     }
 
     /**
@@ -199,11 +207,16 @@ public:
      */
     int ftp_append(char* s, char* d)
     {
-        return ftp_append(clientSocket, s, d);
+        return ftp_append(client_socket, s, d);
     }
 
 private:
-    SOCKET clientSocket; // 命令链路SOCKET
+    SOCKET client_socket; // 命令链路SOCKET
+    char ip[BUFSIZE]; // IP地址
+    int port; // 端口号
+    char user_name[BUFSIZE]; // 用户名
+    char password[BUFSIZE]; // 密码
+    bool file_lock = false; // 文件锁
 
     /**
      * @author 贺宇阳
@@ -795,13 +808,15 @@ private:
      * @param 控制SOCKET
      * @param 源地址
      * @param 目的地址
+     * @param FTPAPI对象
      * @return 0：成功，-1：文件创建失败，其他：服务器返回其他错误码
      */
-    int ftp_download(SOCKET c_sock, char* s, char* d)
+    int ftp_download(SOCKET c_sock, char* s, char* d, FTPAPI ftpapi)
     {
         int result;
         long file_size, section_size, downloaded_size, download_size;
         int thread_num = 4; // 线程数
+        thread* threads(new thread[thread_num]);
         char* temp = new char[strlen(d) + 5]; // 下载临时文件
 
         // 打开本地已下载文件
@@ -815,7 +830,7 @@ private:
         // 获取文件已下载的字节数
         downloaded_size = _filelength(_fileno(fp1));
 
-        // 获取远程文件大小
+        // 获取文件大小
         result = ftp_filesize(c_sock, s, file_size);
         if (result != 0)
         {
@@ -827,7 +842,7 @@ private:
         string str = string(d);
         int pos = str.find_last_of('.');
         sprintf(temp, "%s%s%s", str.substr(0, pos).c_str(), "temp", str.substr(pos).c_str());
-        int num = MultiByteToWideChar(0, 0, temp, -1, nullptr, 0);
+        int num = MultiByteToWideChar(0, 0, temp, -1, NULL, 0);
         wchar_t* wide = new wchar_t[num];
         MultiByteToWideChar(0, 0, temp, -1, wide, num);
         if (create_null_file(0, download_size, wide))
@@ -837,14 +852,16 @@ private:
 
         // 多线程+断点下载
         section_size = download_size / thread_num;
-        FTPAPI ftpapi;
         for (int i = 0; i < thread_num - 1; i++)
         {
-            std::thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, temp, downloaded_size + i * section_size, section_size);
-            t.join();
+            threads[i] = thread (&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + i * section_size, section_size);
+            threads[i].detach();
         }
-        thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
-        t.join();
+        thread t(&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
+        t.detach();
+
+        // 所有子线程完成后向下执行
+        while (ftpapi.finish_num != thread_num);
 
         // 合并文件
         char buf[BUFSIZE];
@@ -855,6 +872,7 @@ private:
             printf("Can't Open the file.\n");
             return -1;
         }
+
         while ((read_len = fread(buf, 1, BUFSIZE, fp2)) > 0)
         {
             write_len = fwrite(buf, 1, read_len, fp1);
@@ -869,6 +887,7 @@ private:
                 break;
             }
         }
+        finish_num = 0;
         fclose(fp1);
         fclose(fp2);
         delete[] temp;
@@ -909,32 +928,38 @@ private:
     /**
      * @author 贺宇阳
      * @brief 下载线程 TYPE PASV REST RETR
-     * @param 控制SOCKET
      * @param 源地址
      * @param 目的地址
      * @param 需下载的文件偏移位置
      * @param 需下载的文件大小
-     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，其他：服务器返回其他错误码
+     * @return 0：成功，-1：文件创建失败，-2：pasv接口错误，-3：登录失败，其他：服务器返回其他错误码
      */
-    int ftp_downloadthread(SOCKET c_sock, char* s, char* d, long offset, long size)
+    int ftp_downloadthread(char* s, char* d, long offset, long size)
     {
         SOCKET d_sock;
         SSIZE_T len, write_len = 0;
         char buf[BUFSIZE];
         int result;
 
-        // 设置文件偏移
-        fstream fs(d, ios::binary | ios::out | ios::in);
-        fs.seekp(offset, ios::beg);
+        // 创建控制socket
+        SOCKET c_sock = connect_server(ip, port);
+        if (c_sock == -1)
+        {
+            return -3;
+        }
+        if (login_server(c_sock, user_name, password) == -1)
+        {
+            closesocket(c_sock);
+            return -3;
+        }
 
-        // 设置传输模式为二进制
+        // 设置传输模式TYPE
         ftp_type(c_sock, 'I');
 
-        // 连接到PASV接口
+        // 连接到PASV接口用于传输文件
         d_sock = ftp_pasv_connect(c_sock);
         if (d_sock == -1)
         {
-            fs.close();
             return -2;
         }
 
@@ -944,7 +969,6 @@ private:
         result = ftp_sendcmd(c_sock, buf);
         if (result != FTP_FILE_ACTION_PAUSE)
         {
-            fs.close();
             return result;
         }
 
@@ -954,35 +978,52 @@ private:
         result = ftp_sendcmd(c_sock, buf);
         if (result != FTP_DATA_CONNECTION_OPEN)
         {
-            fs.close();
             return result;
         }
 
-        // 从PASV数据通道读取数据写入文件
+        // 开始从PASV通道读取数据(下载)
         memset(buf, 0, sizeof(buf));
         while ((len = recv(d_sock, buf, BUFSIZE, 0)) > 0)
         {
-            write_len += len;
-            if (size < write_len)
+            while (true)
             {
-                fs.write(buf, size % len);
-                break;
-            }
-            else
-            {
-                fs.write(buf, len);
-                if (write_len == size)
+                // 读写文件互斥
+                if (!file_lock)
                 {
+                    file_lock = true;
+                    fstream fs(d, ios::binary | ios::out | ios::in);
+                    fs.seekp(offset + write_len, ios::beg);
+
+                    write_len += len;
+                    if (size < write_len)
+                    {
+                        fs.write(buf, size % len);
+                        break;
+                    }
+                    else
+                    {
+                        fs.write(buf, len);
+                        if (write_len == size)
+                        {
+                            break;
+                        }
+                    }
+                    fs.close();
+                    file_lock = false;
                     break;
                 }
+            }
+            if (size <= write_len)
+            {
+                file_lock = false;
+                break;
             }
         }
 
         // 下载完成
         closesocket(d_sock);
-        fs.close();
 
-        // 接收服务器返回值
+        // 接收服务器响应码
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
         buf[len] = 0;
@@ -990,6 +1031,8 @@ private:
         sscanf(buf, "%d", &result);
         if (result == FTP_DATA_CONNECTION_CLOSE)
         {
+            finish_num++;
+            closesocket(c_sock);
             return 0;
         }
         else

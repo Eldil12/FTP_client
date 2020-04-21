@@ -175,7 +175,7 @@ void MainWindow::slot_download2local()
 {
     QPushButton *b = (QPushButton *)sender();
     ftpAPI.ftp_download(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
-                        Login::string2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()));
+                        Login::string2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()), ftpAPI);
     fresh();
 }
 
