@@ -33,10 +33,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>楷体</family>
       <pointsize>10</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="text">
@@ -55,8 +55,8 @@
     <property name="font">
      <font>
       <pointsize>12</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="frameShape">
@@ -78,6 +78,11 @@
       <height>450</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>Fira Code</family>
+     </font>
+    </property>
    </widget>
    <widget class="QListWidget" name="listWidget_HostFile">
     <property name="geometry">
@@ -87,6 +92,11 @@
       <width>530</width>
       <height>401</height>
      </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Fira Code</family>
+     </font>
     </property>
    </widget>
    <widget class="QLineEdit" name="lineEdit_LocalFile">
@@ -100,10 +110,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>Fira Code</family>
       <pointsize>10</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="alignment">
@@ -121,8 +131,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>楷体</family>
       <pointsize>10</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="text">
@@ -140,10 +152,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>Fira Code</family>
       <pointsize>10</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="alignment">
@@ -161,8 +173,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>楷体</family>
       <pointsize>10</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="text">
@@ -178,6 +192,12 @@
       <height>95</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>楷体</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
    </widget>
    <widget class="QLineEdit" name="lineEdit_NewFolder">
     <property name="geometry">
@@ -190,10 +210,10 @@
     </property>
     <property name="font">
      <font>
-      <family>Arial</family>
+      <family>Fira Code</family>
       <pointsize>10</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="alignment">
@@ -211,9 +231,10 @@
     </property>
     <property name="font">
      <font>
+      <family>楷体</family>
       <pointsize>12</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="text">
@@ -231,9 +252,10 @@
     </property>
     <property name="font">
      <font>
+      <family>楷体</family>
       <pointsize>12</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
+      <weight>75</weight>
+      <bold>true</bold>
      </font>
     </property>
     <property name="text">

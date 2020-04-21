@@ -28,7 +28,7 @@ MainWindow::MainWindow(FTPAPI ftpAPI, QString host, QString user, QWidget *paren
     ui->lineEdit_HostFile->setText("./");
 
     char data[BUFSIZE];
-    ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+    ftpAPI.ftp_list(qstring2char(ui->lineEdit_HostFile->text()), data);
     QStringList hostList = QObject::tr(data).simplified().split(" ");
 
     for (QString s : hostList) {
@@ -37,6 +37,8 @@ MainWindow::MainWindow(FTPAPI ftpAPI, QString host, QString user, QWidget *paren
 
     connect(ui->listWidget_HostFile, SIGNAL(itemClicked            (QListWidgetItem *)),
             this,                    SLOT  (slot_showHostFileDetail(QListWidgetItem *)));
+    connect(ui->listWidget_HostFile, SIGNAL(itemDoubleClicked      (QListWidgetItem *)),
+            this,                    SLOT  (slot_enterHostSubDir   (QListWidgetItem *)));
 }
 
 MainWindow::~MainWindow() {
@@ -59,15 +61,14 @@ void MainWindow::slot_enterSubDir(QListWidgetItem *item) {
 void MainWindow::slot_enterHostSubDir(QListWidgetItem *item)
 {
     QString name = ui->lineEdit_HostFile->text() + item->text();
-    long size;
-    ftpAPI.ftp_filesize(Login::string2char(name), size);
 
-    if (size < 0) {
+    long size;
+    if (ftpAPI.ftp_filesize(qstring2char(name), size) != 0) {
         ui->listWidget_HostFile->clear();
         ui->lineEdit_HostFile->setText(name + "/");
 
         char data[BUFSIZE];
-        ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+        ftpAPI.ftp_list(qstring2char(ui->lineEdit_HostFile->text()), data);
         QStringList hostList = QObject::tr(data).simplified().split(" ");
 
         for (QString s : hostList) {
@@ -137,7 +138,7 @@ void MainWindow::slot_showHostFileDetail(QListWidgetItem *item)
     model->setItem(0, 1, newItem);
 
     long size = 0;
-    ftpAPI.ftp_filesize(Login::string2char(ui->lineEdit_HostFile->text()+item->text()), size);
+    ftpAPI.ftp_filesize(qstring2char(ui->lineEdit_HostFile->text()+item->text()), size);
     newItem = new QStandardItem(QString("%1").arg(size));
     model->setItem(0, 2, newItem);
 
@@ -166,23 +167,35 @@ void MainWindow::slot_showHostFileDetail(QListWidgetItem *item)
 void MainWindow::slot_upload2host()
 {
     QPushButton *b = (QPushButton *)sender();
-    ftpAPI.ftp_append(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
-                      Login::string2char(ui->lineEdit_HostFile->text()+b->property("name").toString()));
+    ftpAPI.ftp_append(qstring2char(b->property("path").toString()+"/"+b->property("name").toString()),
+                      qstring2char(ui->lineEdit_HostFile->text()+b->property("name").toString()));
     fresh();
 }
 
 void MainWindow::slot_download2local()
 {
     QPushButton *b = (QPushButton *)sender();
-    ftpAPI.ftp_download(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
-                        Login::string2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()));
+    ftpAPI.ftp_download(qstring2char(b->property("path").toString()+"/"+b->property("name").toString()),
+                        qstring2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()));
     fresh();
 }
 
 void MainWindow::slot_deleteFileFromHost()
 {
     QPushButton *b = (QPushButton *)sender();
-    ftpAPI.ftp_deletefile(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()));
+    QString name = b->property("path").toString()+b->property("name").toString();
+
+    long size;
+    if (ftpAPI.ftp_filesize(qstring2char(name), size) != 0) {
+
+        ftpAPI.ftp_deletefolder(qstring2char(name));
+
+    } else {
+
+        ftpAPI.ftp_deletefile(qstring2char(name));
+
+    }
+
     fresh();
 }
 
@@ -195,7 +208,7 @@ void MainWindow::fresh()
     slot_listAllFile(root);
 
     char data[BUFSIZE];
-    ftpAPI.ftp_list(Login::string2char(ui->lineEdit_HostFile->text()), data);
+    ftpAPI.ftp_list(qstring2char(ui->lineEdit_HostFile->text()), data);
     QStringList hostList = QObject::tr(data).simplified().split(" ");
 
     for (QString s : hostList) {
@@ -206,7 +219,7 @@ void MainWindow::fresh()
 void MainWindow::on_pushButton_NewFolder_clicked()
 {
     QString newFolder = ui->lineEdit_HostFile->text() + ui->lineEdit_NewFolder->text() + "/";
-    ftpAPI.ftp_mkd(Login::string2char(newFolder));
+    ftpAPI.ftp_mkd(qstring2char(newFolder));
     fresh();
 }
 
@@ -215,6 +228,6 @@ void MainWindow::on_pushButton_PreFolder_clicked()
     ftpAPI.ftp_cdup();
     char path[BUFSIZE];
     ftpAPI.ftp_cwd(path);
-    ui->lineEdit_HostFile->setText(path);
+    ui->lineEdit_HostFile->setText(QString::fromLocal8Bit(path));
     fresh();
 }

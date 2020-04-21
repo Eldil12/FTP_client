@@ -19,7 +19,9 @@ void Login::on_pushButton_Login_clicked() {
     QString userName = ui->lineEdit_UserName->text();
     QString password = ui->lineEdit_Password->text();
 
-    int result = ftpAPI.login_server( string2char(hostName), port.toInt(), string2char(userName), string2char(password) );
+    qDebug() << qstring2char(hostName) << port.toInt() << qstring2char(userName) << qstring2char(password);
+
+    int result = ftpAPI.login_server( qstring2char(hostName), port.toInt(), qstring2char(userName), qstring2char(password) );
 
     if ( result == -1 ) {
 
@@ -39,10 +41,4 @@ void Login::on_pushButton_Login_clicked() {
         mainWindow->show();
 
     }
-}
-
-char *Login::string2char(QString s) {
-
-    QByteArray b = s.toLatin1();
-    return b.data();
 }

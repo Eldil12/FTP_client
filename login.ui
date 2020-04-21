@@ -27,7 +27,7 @@
    </property>
    <property name="font">
     <font>
-     <family>等线</family>
+     <family>楷体</family>
      <pointsize>16</pointsize>
      <weight>75</weight>
      <italic>false</italic>
@@ -53,7 +53,7 @@
    </property>
    <property name="font">
     <font>
-     <family>Arial</family>
+     <family>Fira Code</family>
      <pointsize>12</pointsize>
      <weight>50</weight>
      <bold>false</bold>
@@ -80,7 +80,7 @@
    </property>
    <property name="font">
     <font>
-     <family>等线</family>
+     <family>楷体</family>
      <pointsize>16</pointsize>
      <weight>75</weight>
      <italic>false</italic>
@@ -106,7 +106,7 @@
    </property>
    <property name="font">
     <font>
-     <family>Arial</family>
+     <family>Fira Code</family>
      <pointsize>10</pointsize>
     </font>
    </property>
@@ -134,11 +134,11 @@
    </property>
    <property name="font">
     <font>
-     <family>等线</family>
+     <family>楷体</family>
      <pointsize>16</pointsize>
-     <weight>50</weight>
+     <weight>75</weight>
      <italic>false</italic>
-     <bold>false</bold>
+     <bold>true</bold>
      <stylestrategy>PreferAntialias</stylestrategy>
     </font>
    </property>
@@ -163,7 +163,7 @@
    </property>
    <property name="font">
     <font>
-     <family>等线</family>
+     <family>楷体</family>
      <pointsize>16</pointsize>
      <weight>75</weight>
      <italic>false</italic>
@@ -189,7 +189,7 @@
    </property>
    <property name="font">
     <font>
-     <family>Arial</family>
+     <family>Fira Code</family>
      <pointsize>12</pointsize>
      <weight>50</weight>
      <bold>false</bold>
@@ -213,7 +213,7 @@
    </property>
    <property name="font">
     <font>
-     <family>Arial</family>
+     <family>Fira Code</family>
      <pointsize>12</pointsize>
      <weight>50</weight>
      <bold>false</bold>

@@ -50,6 +50,11 @@ private:
     QString user;
 
     void fresh();
+
+    static char *qstring2char(QString s) {
+        QByteArray array = s.toLocal8Bit();
+        return array.data();
+    }
 };
 
 #endif // MAINWINDOW_H
