@@ -765,18 +765,29 @@ private:
         }
     }
 
-  	 /**
-	  * @brief 从服务器复制文件到本地（多线程+断点下载）SIZE TYPE PASV REST RETR
-	  * @param SOCKET
-	  * @param 源地址
-	  * @param 目的地址
-	  * @return 0：成功，-1：文件创建失败，其他：服务器返回其他错误码
-	  */
+    /**
+     * @brief 从服务器复制文件到本地（多线程+断点下载）SIZE TYPE PASV REST RETR
+     * @param SOCKET
+     * @param 源地址
+     * @param 目的地址
+     * @return 0：成功，-1：文件创建失败，其他：服务器返回其他错误码
+     */
 	int ftp_download(SOCKET c_sock, char* s, char* d)
 	{
 		int send_re;
-		long file_size, section_size;
+		long file_size, section_size, downloaded_size, download_size;
 		int thread_num = 4;
+		char* temp = new char[strlen(d) + 5];
+
+		// 打开本地已下载文件
+		FILE* fp1 = fopen(d, "ab+");
+		if (fp1 == nullptr)
+		{
+			printf("Can't Open the file.\n");
+			return -1;
+		}
+		// 获取文件已下载的字节数
+		downloaded_size = _filelength(_fileno(fp1));
 
 		// 获取文件大小
 		send_re = ftp_filesize(c_sock, s, file_size);
@@ -784,46 +795,79 @@ private:
 		{
 			return send_re;
 		}
-		
-		// 创建文件
-		int num = MultiByteToWideChar(0, 0, d, -1, NULL, 0);
+
+		// 创建下载临时文件
+		download_size = file_size - downloaded_size;
+		string str = string(d);
+		int pos = str.find_last_of('.');
+		sprintf(temp, "%s%s%s", str.substr(0, pos).c_str(), "temp", str.substr(pos).c_str());
+        int num = MultiByteToWideChar(0, 0, temp, -1, nullptr, 0);
 		wchar_t* wide = new wchar_t[num];
-		MultiByteToWideChar(0, 0, d, -1, wide, num);
-		if (CreateNullFile(0, file_size, wide) != 0)
+		MultiByteToWideChar(0, 0, temp, -1, wide, num);
+		if (CreateNullFile(0, download_size, wide))
 		{
 			return -1;
 		}
-		
-		section_size = file_size / thread_num;
+
+		// 多线程+断点下载
+		section_size = download_size / thread_num;
 		FTPAPI ftpapi;
 		for (int i = 0; i < thread_num - 1; i++)
 		{
-			std::thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, d, i * section_size, section_size);
+			std::thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, temp, downloaded_size + i * section_size, section_size);
 			t.join();
 		}
-		thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, d, (thread_num - 1) * section_size, file_size - (thread_num - 1) * section_size);
+		thread t(&FTPAPI::ftp_downloadthread, &ftpapi, c_sock, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
 		t.join();
-        return 0;
+
+		// 合并文件
+		char buf[BUFSIZE];
+		SSIZE_T write_len, read_len;
+		FILE* fp2 = fopen(temp, "ab+");
+		if (fp2 == nullptr)
+		{
+			printf("Can't Open the file.\n");
+			return -1;
+		}
+		while ((read_len = fread(buf, 1, BUFSIZE, fp2)) > 0)
+		{
+			write_len = fwrite(buf, 1, read_len, fp1);
+			if (ferror(fp1) || ferror(fp2))
+			{
+				fclose(fp1);
+				fclose(fp2);
+				return -3;
+			}
+			if (write_len <= 0)
+			{
+				break;
+			}
+		}
+		fclose(fp1);
+		fclose(fp2);
+		delete[] temp;
 	}
 
-	/*
-	 * 创建指定大小的空文件,支持超大文件(16EB),小于4GB时, 
-	 * 参数dwHigh可传入0,
-	 * 成功返回0，失败返回错误代码
+	/**
+	 * @brief 创建指定大小的空文件（支持超大文件16EB，小于4GB时，参数dwHigh可传入0）
+	 * @param 文件地址高32位偏移量
+	 * @param 文件地址低32位偏移量
+	 * @param 文件路径
+	 * @return 0：文件创建成功，其他：文件创建失败
 	 */
 	BOOL CreateNullFile(DWORD dwHigh, DWORD dwLow, LPCTSTR lpcszFileName)
 	{
 		BOOL bResult = FALSE;
 		HANDLE hFile = ::CreateFile(lpcszFileName, GENERIC_READ | GENERIC_WRITE,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (INVALID_HANDLE_VALUE == hFile)
 		{
 			return (BOOL)::GetLastError();
 		}
 
-		HANDLE hFileMap = ::CreateFileMapping(hFile, NULL, PAGE_READWRITE, dwHigh, dwLow, NULL);
-		if (NULL == hFileMap)
+        HANDLE hFileMap = ::CreateFileMapping(hFile, nullptr, PAGE_READWRITE, dwHigh, dwLow, nullptr);
+        if (nullptr == hFileMap)
 		{
 			return (BOOL)::GetLastError();
 		}
