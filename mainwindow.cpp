@@ -175,8 +175,13 @@ void MainWindow::slot_upload2host()
 void MainWindow::slot_download2local()
 {
     QPushButton *b = (QPushButton *)sender();
+<<<<<<< HEAD
     ftpAPI.ftp_download(qstring2char(b->property("path").toString()+"/"+b->property("name").toString()),
                         qstring2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()));
+=======
+    ftpAPI.ftp_download(Login::string2char(b->property("path").toString()+"/"+b->property("name").toString()),
+                        Login::string2char(ui->lineEdit_LocalFile->text()+b->property("name").toString()), ftpAPI);
+>>>>>>> f1e4dc1cb23b4fb1891a0b5f27c8d32ca8f0c145
     fresh();
 }
 
