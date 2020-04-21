@@ -60,7 +60,7 @@ public:
     }
 
     /**
-     * @brief 断开FTP服务器
+     * @brief 断开FTP服务器 QUIT
      * @return 断开服务器的状态码
      */
     int ftp_quit()
@@ -117,7 +117,7 @@ public:
     }
 
     /**
-     * @brief 如果是文件名列出文件信息，如果是目录则列出文件列表 LIST
+     * @brief 列出文件列表 LIST
      * @param 相对路径或绝对路径
      * @param 列表信息
      * @return 0：成功，-1：创建pasv错误，其他：服务器返回其他错误码
@@ -214,7 +214,7 @@ private:
     SOCKET socket_connect(char* host, int port)
     {
         int i = 0;
-        //初始化 Socket dll
+        // 初始化Socket库
         WSADATA wsaData;
         WORD socketVersion = MAKEWORD(2, 0);
         if (WSAStartup(socketVersion, &wsaData))
@@ -230,7 +230,7 @@ private:
         }
         unsigned char ch[4];
         char ip[20];
-        //一个hostname 可以对应多个ip
+        // 一个hostname可以对应多个ip
         while (server->h_addr_list[i] != nullptr)
         {
             memcpy(&ch, server->h_addr_list[i], 4);
@@ -238,23 +238,23 @@ private:
             i++;
         }
 
-        //创建Socket
+        // 创建Socket
         SOCKET s = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (s == SOCKET_ERROR)
         {
             qDebug() << "Create Socket Error!";
             return -1;
         }
-        //设置超时连接
-        int timeout = 3000; //复杂的网络环境要设置超时判断
+        // 设置超时连接
+        int timeout = 3000; // 复杂的网络环境要设置超时判断
         int ret = setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
         ret = setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
-        //指定服务器地址
+        // 指定服务器地址
         struct sockaddr_in address;
         address.sin_family = AF_INET;
         address.sin_addr.S_un.S_addr = inet_addr(ip);
         address.sin_port = htons((unsigned short)port);
-        //连接
+        // 连接服务器
         if (connect(s, (LPSOCKADDR)&address, sizeof(address)) == SOCKET_ERROR)
         {
             qDebug() << "Can Not Connect To Server IP!\n";
@@ -466,6 +466,46 @@ private:
     }
 
     /**
+     * @brief 连接到PASV接口 PASV
+     *        被动方式连接过程：客户端向服务器的FTP端口（默认是21）发送连接请求，服务器接受连接，建立一条命令链路。
+     * @param 命令链路SOCKET cmd-socket
+     * @return 数据链路SOCKET raw-socket，-1：创建失败
+     */
+    SOCKET ftp_pasv_connect(SOCKET c_sock)
+    {
+        SOCKET r_sock;
+        int send_result;
+        SSIZE_T len;
+        int addr[6]; //IP*4+Port*2
+        char buf[BUFSIZE];
+        char result_buf[BUFSIZE];
+
+        // 设置PASV被动模式
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "PASV\r\n");
+        send_result = ftp_sendcmd_re(c_sock, buf, result_buf, &len);
+        if (send_result == 0)
+        {
+            sscanf(result_buf, "%*[^(](%d,%d,%d,%d,%d,%d)",
+                &addr[0], &addr[1], &addr[2], &addr[3],
+                &addr[4], &addr[5]);
+        }
+
+        // 连接PASV端口
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
+        r_sock = socket_connect(buf, addr[4] * 256 + addr[5]);
+        if (r_sock == -1)
+        {
+            return -1;
+        }
+        else
+        {
+            return r_sock;
+        }
+    }
+
+    /**
      * @brief 无动作，告知服务器保持连接 NOOP
      * @param SOCKET
      * @return 0：成功，-1：失败
@@ -549,46 +589,6 @@ private:
     }
 
     /**
-     * @brief 连接到PASV接口 PASV
-     *        被动方式连接过程：客户端向服务器的FTP端口（默认是21）发送连接请求，服务器接受连接，建立一条命令链路。
-     * @param 命令链路SOCKET cmd-socket
-     * @return 数据链路SOCKET raw-socket，-1：创建失败
-     */
-    SOCKET ftp_pasv_connect(SOCKET c_sock)
-    {
-        SOCKET r_sock;
-        int send_result;
-        SSIZE_T len;
-        int addr[6]; //IP*4+Port*2
-        char buf[BUFSIZE];
-        char result_buf[BUFSIZE];
-
-        //设置PASV被动模式
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "PASV\r\n");
-        send_result = ftp_sendcmd_re(c_sock, buf, result_buf, &len);
-        if (send_result == 0)
-        {
-            sscanf(result_buf, "%*[^(](%d,%d,%d,%d,%d,%d)",
-                &addr[0], &addr[1], &addr[2], &addr[3],
-                &addr[4], &addr[5]);
-        }
-
-        //连接PASV端口
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3]);
-        r_sock = socket_connect(buf, addr[4] * 256 + addr[5]);
-        if (r_sock == -1)
-        {
-            return -1;
-        }
-        else
-        {
-            return r_sock;
-        }
-    }
-
-    /**
      * @brief 显示当前工作目录 PWD
      * @param SOCKET
      * @param 当前工作目录
@@ -666,6 +666,28 @@ private:
     }
 
     /**
+     * @brief 删除目录 RMD
+     * @param 命令链路SOCKET
+     * @param 相对路径或绝对路径
+     * @return 0：成功，其他：服务器返回错误码
+     */
+    int ftp_deletefolder(SOCKET sock, char* path)
+    {
+        char buf[BUFSIZE];
+        int result;
+        sprintf(buf, "RMD %s\r\n", path);
+        result = ftp_sendcmd(sock, buf);
+        if (result == FTP_FILE_ACTION_COMPLETE) //250 File deleted successfully
+        {
+            return 0;
+        }
+        else
+        {
+            return result;
+        }
+    }
+
+    /**
      * @brief 获取文件大小 SIZE
      * @param SOCKET
      * @param 相对路径或绝对路径
@@ -683,28 +705,6 @@ private:
         size = atoi(const_cast<char*>(ans));
 
         if (result == FTP_FILE_STATUS)
-        {
-            return 0;
-        }
-        else
-        {
-            return result;
-        }
-    }
-
-    /**
-     * @brief 删除目录 RMD
-     * @param 命令链路SOCKET
-     * @param 相对路径或绝对路径
-     * @return 0：成功，其他：服务器返回错误码
-     */
-    int ftp_deletefolder(SOCKET sock, char* path)
-    {
-        char buf[BUFSIZE];
-        int result;
-        sprintf(buf, "RMD %s\r\n", path);
-        result = ftp_sendcmd(sock, buf);
-        if (result == FTP_FILE_ACTION_COMPLETE) //250 File deleted successfully
         {
             return 0;
         }
@@ -737,7 +737,7 @@ private:
     }
 
     /**
-     * @brief 修改文件名&移动目录 RNFR RNTO
+     * @brief 修改文件名、移动文件 RNFR RNTO
      * @param 命令链路SOCKET
      * @param 源地址
      * @param 目的地址
@@ -804,7 +804,7 @@ private:
         int num = MultiByteToWideChar(0, 0, temp, -1, nullptr, 0);
 		wchar_t* wide = new wchar_t[num];
 		MultiByteToWideChar(0, 0, temp, -1, wide, num);
-		if (CreateNullFile(0, download_size, wide))
+        if (create_null_file(0, download_size, wide))
 		{
 			return -1;
 		}
@@ -856,7 +856,7 @@ private:
 	 * @param 文件路径
 	 * @return 0：文件创建成功，其他：文件创建失败
 	 */
-	BOOL CreateNullFile(DWORD dwHigh, DWORD dwLow, LPCTSTR lpcszFileName)
+    BOOL create_null_file(DWORD dwHigh, DWORD dwLow, LPCTSTR lpcszFileName)
 	{
 		BOOL bResult = FALSE;
 		HANDLE hFile = ::CreateFile(lpcszFileName, GENERIC_READ | GENERIC_WRITE,
@@ -895,6 +895,7 @@ private:
 		char buf[BUFSIZE];
 		int result;
 
+        // 设置文件偏移
 		fstream fs(d, ios::binary | ios::out | ios::in);
 		fs.seekp(offset, ios::beg);
 
@@ -970,7 +971,7 @@ private:
 	}
   
     /**
-     * @brief 从本地上传文件到服务器（替换） TYPE PASV STOR
+     * @brief 从本地上传文件到服务器（不存在则创建，存在则替换） TYPE PASV STOR
      * @param SOCKET
      * @param 源地址
      * @param 目的地址
@@ -994,6 +995,7 @@ private:
 
         // 设置传输模式
         ftp_type(c_sock, 'I');
+
         // 连接到PASV接口
         d_sock = ftp_pasv_connect(c_sock);
         if (d_sock == -1)
@@ -1029,7 +1031,7 @@ private:
         closesocket(d_sock);
         fclose(fp);
 
-        //向服务器接收响应码
+        // 向服务器接收响应码
         memset(buf, 0, sizeof(buf));
         len = recv(c_sock, buf, BUFSIZE, 0);
         buf[len] = 0;
@@ -1090,17 +1092,6 @@ private:
         {
             uploaded_size = 0;
         }
-
-        // 发送APPE命令
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "APPE %s\r\n", d);
-        send_re = ftp_sendcmd(c_sock, buf);
-        if (send_re != FTP_DATA_CONNECTION_OPEN)
-        {
-            fclose(fp);
-            return send_re;
-        }
-
         // 获取本地文件大小
         file_size = _filelength(_fileno(fp));
 
@@ -1113,6 +1104,16 @@ private:
         else
         {
             fseek(fp, uploaded_size, SEEK_SET);
+        }
+
+        // 发送APPE命令
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "APPE %s\r\n", d);
+        send_re = ftp_sendcmd(c_sock, buf);
+        if (send_re != FTP_DATA_CONNECTION_OPEN)
+        {
+            fclose(fp);
+            return send_re;
         }
 
         // 开始向PASV通道写数据
