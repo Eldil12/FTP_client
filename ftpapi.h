@@ -857,8 +857,8 @@ private:
             threads[i] = thread(&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + i * section_size, section_size);
             threads[i].detach();
         }
-        thread t(&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
-        t.detach();
+        threads[thread_num - 1] = thread (&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
+        threads[thread_num - 1].detach();
 
         // 所有子线程完成后向下执行
         while (ftpapi.finish_num != thread_num)
