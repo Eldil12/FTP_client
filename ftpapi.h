@@ -824,6 +824,8 @@ private:
         FILE* fp1 = fopen(d, "ab+");
         if (fp1 == nullptr)
         {
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -834,6 +836,9 @@ private:
         result = ftp_filesize(c_sock, s, file_size);
         if (result != 0)
         {
+            fclose(fp1);
+            delete[] temp;
+            delete[] threads;
             return result;
         }
 
@@ -847,6 +852,9 @@ private:
         MultiByteToWideChar(0, 0, temp, -1, wide, num);
         if (create_null_file(0, download_size, wide))
         {
+            fclose(fp1);
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -865,6 +873,10 @@ private:
         {
             if (ftpapi.download_error)
             {
+                fclose(fp1);
+                remove(temp);
+                delete[] temp;
+                delete[] threads;
                 return -3;
             }
         }
@@ -875,6 +887,10 @@ private:
         FILE* fp2 = fopen(temp, "ab+");
         if (fp2 == nullptr)
         {
+            fclose(fp1);
+            remove(temp);
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -885,6 +901,9 @@ private:
             {
                 fclose(fp1);
                 fclose(fp2);
+                remove(temp);
+                delete[] temp;
+                delete[] threads;
                 return -2;
             }
             if (write_len <= 0)
@@ -1041,15 +1060,14 @@ private:
         buf[len] = 0;
         printf("%s\n", buf);
         sscanf(buf, "%d", &result);
+        finish_num++;
+        closesocket(c_sock);
         if (result == FTP_DATA_CONNECTION_CLOSE)
         {
-            finish_num++;
-            closesocket(c_sock);
             return 0;
         }
         else
         {
-            download_error = true;
             return result;
         }
     }
