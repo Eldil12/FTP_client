@@ -36,6 +36,7 @@ class FTPAPI
 {
 public:
     int finish_num = 0; // 完成的线程数
+    bool download_error = false;
 
     /**
      * @brief 连接并登录FTP服务器 USER PASS
@@ -263,8 +264,8 @@ private:
 
         // 设置超时连接
         int timeout = 3000;
-        int ret = setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
-        ret = setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+        setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout));
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
 
         // 指定服务器地址、端口号
         struct sockaddr_in address;
@@ -809,13 +810,13 @@ private:
      * @param 源地址
      * @param 目的地址
      * @param FTPAPI对象
-     * @return 0：成功，-1：文件创建失败，其他：服务器返回其他错误码
+     * @return 0：成功，-1：文件创建失败，-2：文件合并失败，-3：文件下载失败，其他：服务器返回其他错误码
      */
     int ftp_download(SOCKET c_sock, char* s, char* d, FTPAPI ftpapi)
     {
         int result;
         long file_size, section_size, downloaded_size, download_size;
-        int thread_num = 4; // 线程数
+        int thread_num = 1; // 线程数
         thread* threads(new thread[thread_num]);
         char* temp = new char[strlen(d) + 5]; // 下载临时文件
 
@@ -823,7 +824,8 @@ private:
         FILE* fp1 = fopen(d, "ab+");
         if (fp1 == nullptr)
         {
-            printf("Can't Open the file.\n");
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -834,6 +836,9 @@ private:
         result = ftp_filesize(c_sock, s, file_size);
         if (result != 0)
         {
+            fclose(fp1);
+            delete[] temp;
+            delete[] threads;
             return result;
         }
 
@@ -842,11 +847,14 @@ private:
         string str = string(d);
         int pos = str.find_last_of('.');
         sprintf(temp, "%s%s%s", str.substr(0, pos).c_str(), "temp", str.substr(pos).c_str());
-        int num = MultiByteToWideChar(0, 0, temp, -1, NULL, 0);
+        int num = MultiByteToWideChar(0, 0, temp, -1, nullptr, 0);
         wchar_t* wide = new wchar_t[num];
         MultiByteToWideChar(0, 0, temp, -1, wide, num);
         if (create_null_file(0, download_size, wide))
         {
+            fclose(fp1);
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -854,14 +862,24 @@ private:
         section_size = download_size / thread_num;
         for (int i = 0; i < thread_num - 1; i++)
         {
-            threads[i] = thread (&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + i * section_size, section_size);
+            threads[i] = thread(&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + i * section_size, section_size);
             threads[i].detach();
         }
-        thread t(&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
-        t.detach();
+        threads[thread_num - 1] = thread (&FTPAPI::ftp_downloadthread, &ftpapi, s, temp, downloaded_size + (thread_num - 1) * section_size, download_size - (thread_num - 1) * section_size);
+        threads[thread_num - 1].detach();
 
         // 所有子线程完成后向下执行
-        while (ftpapi.finish_num != thread_num);
+        while (ftpapi.finish_num != thread_num)
+        {
+            if (ftpapi.download_error)
+            {
+                fclose(fp1);
+                remove(temp);
+                delete[] temp;
+                delete[] threads;
+                return -3;
+            }
+        }
 
         // 合并文件
         char buf[BUFSIZE];
@@ -869,7 +887,10 @@ private:
         FILE* fp2 = fopen(temp, "ab+");
         if (fp2 == nullptr)
         {
-            printf("Can't Open the file.\n");
+            fclose(fp1);
+            remove(temp);
+            delete[] temp;
+            delete[] threads;
             return -1;
         }
 
@@ -880,7 +901,10 @@ private:
             {
                 fclose(fp1);
                 fclose(fp2);
-                return -3;
+                remove(temp);
+                delete[] temp;
+                delete[] threads;
+                return -2;
             }
             if (write_len <= 0)
             {
@@ -890,7 +914,9 @@ private:
         finish_num = 0;
         fclose(fp1);
         fclose(fp2);
+        remove(temp);
         delete[] temp;
+        delete[] threads;
         return 0;
     }
 
@@ -906,8 +932,8 @@ private:
     {
         BOOL bResult = FALSE;
         HANDLE hFile = ::CreateFile(lpcszFileName, GENERIC_READ | GENERIC_WRITE,
-                                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                    nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (INVALID_HANDLE_VALUE == hFile)
         {
             return (BOOL)::GetLastError();
@@ -945,10 +971,12 @@ private:
         SOCKET c_sock = connect_server(ip, port);
         if (c_sock == -1)
         {
+            download_error = true;
             return -3;
         }
         if (login_server(c_sock, user_name, password) == -1)
         {
+            download_error = true;
             closesocket(c_sock);
             return -3;
         }
@@ -960,6 +988,7 @@ private:
         d_sock = ftp_pasv_connect(c_sock);
         if (d_sock == -1)
         {
+            download_error = true;
             return -2;
         }
 
@@ -969,6 +998,7 @@ private:
         result = ftp_sendcmd(c_sock, buf);
         if (result != FTP_FILE_ACTION_PAUSE)
         {
+            download_error = true;
             return result;
         }
 
@@ -978,6 +1008,7 @@ private:
         result = ftp_sendcmd(c_sock, buf);
         if (result != FTP_DATA_CONNECTION_OPEN)
         {
+            download_error = true;
             return result;
         }
 
@@ -1029,10 +1060,10 @@ private:
         buf[len] = 0;
         printf("%s\n", buf);
         sscanf(buf, "%d", &result);
+        finish_num++;
+        closesocket(c_sock);
         if (result == FTP_DATA_CONNECTION_CLOSE)
         {
-            finish_num++;
-            closesocket(c_sock);
             return 0;
         }
         else
